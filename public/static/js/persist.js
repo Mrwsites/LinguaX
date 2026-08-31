@@ -1,4 +1,4 @@
-/* ===== LinguaX Phase 1.5 — Persistence Layer ===== */
+/* ===== LinguaX Phase 1.5.1 — Persistence Layer ===== */
 /*
  * All learner attempt data is stored in localStorage under the key
  * "lx_store_v1". The structure is:
@@ -17,6 +17,15 @@
  *   attempt_events: { [attemptId]: AttemptEvent[] }
  * }
  *
+ * Stage status values (Phase 1.5.1):
+ *   NOT_STARTED   — Learner has not opened the stage
+ *   VIEWED        — Learner opened/read an informational stage and continued
+ *   IN_PROGRESS   — Learner has started an interaction but not submitted it
+ *   ATTEMPTED     — Learner submitted, but results are incomplete or weak
+ *   COMPLETED     — Learner completed the required interaction(s)
+ *   NEEDS_REVIEW  — Submitted but low accuracy; should revisit
+ *   NOT_ASSESSED  — No performance score; stage is informational only
+ *
  * IMMUTABILITY RULE:
  * - A completed attempt record is NEVER modified after status = COMPLETED.
  * - New retries always create a brand-new attempt record with a new id and
@@ -31,6 +40,17 @@
   const LEARNER_ID = 'learner-alex-johnson';
   const LESSON_ID = 'A1-BE-LOST-PROPERTY-001';
   const LESSON_VERSION = '1.0.0';
+
+  // ── STAGE STATUS CONSTANTS ──
+  const STAGE_STATUS = {
+    NOT_STARTED:  'NOT_STARTED',
+    VIEWED:       'VIEWED',
+    IN_PROGRESS:  'IN_PROGRESS',
+    ATTEMPTED:    'ATTEMPTED',
+    COMPLETED:    'COMPLETED',
+    NEEDS_REVIEW: 'NEEDS_REVIEW',
+    NOT_ASSESSED: 'NOT_ASSESSED',
+  };
 
   // ── INSTRUCTIONAL STAGE KEYS (10 stages = 100%) ──
   // These are the only stages that count toward learner-visible progress.
@@ -48,6 +68,19 @@
   ];
   // 'overview' and 'review' do NOT count toward learner-visible progress.
   const INSTRUCTIONAL_STAGE_COUNT = INSTRUCTIONAL_STAGE_KEYS.length; // 10
+
+  // ── EVIDENCE STAGES (required assessed activities) ──
+  const EVIDENCE_STAGE_KEYS = [
+    'visual',
+    'grammar',
+    'coresentence',
+    'vocabulary',
+    'phrases',
+    'practice',
+    'dialogue',
+    'infogap',
+    'transfer',
+  ];
 
   // ── STORAGE HELPERS ──
   function loadStore() {
@@ -180,6 +213,7 @@
       current_stage_key: 'overview',
       current_stage_index: 0,
       completion_percent: 0,
+      evidence_count: 0,
       total_score: null,
       max_score: 16,
       result_band: null,
@@ -226,17 +260,112 @@
   }
 
   /**
-   * Save progress for the current in-progress attempt.
-   * Persists: current stage, stage responses, exercise state, dialogue, transfer, etc.
+   * Central stage-attempt update function (Phase 1.5.1).
+   * This is the SINGLE source of truth for all stage state changes.
+   *
+   * @param {string} attemptId  - The active lesson attempt id
+   * @param {string} stageKey   - The stage key (e.g. 'practice', 'dialogue')
+   * @param {object} payload    - { status, responseData, score, maxScore, feedback, completedAt, startedAt }
+   * @returns {object|null}     - The updated stage_attempt record
+   */
+  function updateStageAttempt(attemptId, stageKey, payload) {
+    const store = getStore();
+    const attempt = store.lesson_attempts[attemptId];
+    if (!attempt) {
+      console.warn('[LX persist] updateStageAttempt: no attempt found', attemptId);
+      return null;
+    }
+
+    // IMMUTABILITY GUARD
+    if (attempt.status === 'COMPLETED' || attempt.status === 'SUBMITTED') {
+      console.warn('[LX persist] updateStageAttempt: attempt already completed — blocked');
+      return null;
+    }
+
+    if (!store.stage_attempts[attemptId]) {
+      store.stage_attempts[attemptId] = {};
+    }
+
+    const now = new Date().toISOString();
+    const existing = store.stage_attempts[attemptId][stageKey];
+
+    const updatedStage = {
+      id: existing?.id || `sa-${attemptId}-${stageKey}`,
+      organization_id: ORG_ID,
+      lesson_attempt_id: attemptId,
+      stage_key: stageKey,
+      status: payload.status || STAGE_STATUS.IN_PROGRESS,
+      started_at: existing?.started_at || payload.startedAt || now,
+      last_saved_at: now,
+      completed_at: (payload.status === STAGE_STATUS.COMPLETED || payload.status === STAGE_STATUS.NEEDS_REVIEW || payload.status === STAGE_STATUS.ATTEMPTED)
+        ? (existing?.completed_at || payload.completedAt || now)
+        : null,
+      response_data_json: payload.responseData !== undefined ? payload.responseData : (existing?.response_data_json || null),
+      score: payload.score !== undefined ? payload.score : (existing?.score ?? null),
+      max_score: payload.maxScore !== undefined ? payload.maxScore : (existing?.max_score ?? null),
+      feedback_json: payload.feedback !== undefined ? payload.feedback : (existing?.feedback_json || null),
+      created_at: existing?.created_at || now,
+      updated_at: now,
+    };
+
+    store.stage_attempts[attemptId][stageKey] = updatedStage;
+
+    // Recalculate attempt progress
+    _recalculateProgress(store, attempt, now);
+
+    // Log event
+    _logEvent(store, attemptId, 'STAGE_UPDATED', {
+      stage_key: stageKey,
+      status: updatedStage.status,
+      score: updatedStage.score,
+    });
+
+    saveStore(store);
+    return updatedStage;
+  }
+
+  /**
+   * Recalculate learning progress and evidence count for an attempt.
+   */
+  function _recalculateProgress(store, attempt, now) {
+    const stageAttempts = store.stage_attempts[attempt.id] || {};
+
+    // Learning progress: instructional stages that are VIEWED / COMPLETED / ATTEMPTED / NEEDS_REVIEW
+    const viewedStatuses = new Set([
+      STAGE_STATUS.VIEWED, STAGE_STATUS.COMPLETED,
+      STAGE_STATUS.ATTEMPTED, STAGE_STATUS.NEEDS_REVIEW, STAGE_STATUS.NOT_ASSESSED
+    ]);
+    const completedInstructional = INSTRUCTIONAL_STAGE_KEYS.filter(key => {
+      const sa = stageAttempts[key];
+      return sa && viewedStatuses.has(sa.status);
+    });
+    attempt.completion_percent = Math.min(
+      100,
+      Math.round((completedInstructional.length / INSTRUCTIONAL_STAGE_COUNT) * 100)
+    );
+
+    // Evidence count: evidence stages that are ATTEMPTED / COMPLETED / NEEDS_REVIEW
+    const evidenceStatuses = new Set([STAGE_STATUS.COMPLETED, STAGE_STATUS.ATTEMPTED, STAGE_STATUS.NEEDS_REVIEW]);
+    const evidenceCompleted = EVIDENCE_STAGE_KEYS.filter(key => {
+      const sa = stageAttempts[key];
+      return sa && evidenceStatuses.has(sa.status);
+    });
+    attempt.evidence_count = evidenceCompleted.length;
+    attempt.last_saved_at = now;
+    attempt.updated_at = now;
+  }
+
+  /**
+   * Save progress for the current in-progress attempt (legacy auto-save path).
    */
   function saveProgress(attemptId, progressData) {
     const store = getStore();
     const attempt = store.lesson_attempts[attemptId];
     if (!attempt) return;
 
-    // IMMUTABILITY GUARD: never save into a completed attempt
+    // IMMUTABILITY GUARD
     if (attempt.status === 'COMPLETED' || attempt.status === 'SUBMITTED') {
-      console.warn('[LX persist] Attempted to save into a completed attempt. Blocked.');
+      console.warn('[LX persist] saveProgress: attempted to save into a completed attempt. Blocked.');
       return;
     }
 
@@ -253,42 +382,35 @@
     // Calculate duration (wall clock from started_at)
     attempt.duration_seconds = Math.floor((nowDate - startedAt) / 1000);
 
-    // Calculate active duration (sum of active intervals from events)
+    // Calculate active duration
     attempt.active_duration_seconds = progressData.activeDurationSeconds || attempt.active_duration_seconds;
 
-    // Calculate completion percent (only instructional stages count)
-    const completedInstructional = (progressData.stagesCompleted || []).filter(
-      key => INSTRUCTIONAL_STAGE_KEYS.includes(key)
-    );
-    attempt.completion_percent = Math.min(
-      100,
-      Math.round((completedInstructional.length / INSTRUCTIONAL_STAGE_COUNT) * 100)
-    );
-
-    // Save stage-level responses
-    if (progressData.stageResponses) {
-      for (const [stageKey, responseData] of Object.entries(progressData.stageResponses)) {
-        const existingStageAttempt = store.stage_attempts[attemptId][stageKey];
+    // Save stage-level responses using the new status model
+    if (progressData.stageAttempts) {
+      for (const [stageKey, saData] of Object.entries(progressData.stageAttempts)) {
+        if (!saData) continue;
+        const existing = store.stage_attempts[attemptId]?.[stageKey];
         store.stage_attempts[attemptId][stageKey] = {
-          id: existingStageAttempt?.id || `sa-${attemptId}-${stageKey}`,
+          id: existing?.id || `sa-${attemptId}-${stageKey}`,
           organization_id: ORG_ID,
           lesson_attempt_id: attemptId,
           stage_key: stageKey,
-          stage_label: progressData.stageLabels?.[stageKey] || stageKey,
-          stage_index: progressData.stageIndices?.[stageKey] ?? 0,
-          status: responseData.completed ? 'COMPLETED' : 'IN_PROGRESS',
-          started_at: existingStageAttempt?.started_at || now,
+          status: saData.status || STAGE_STATUS.IN_PROGRESS,
+          started_at: existing?.started_at || saData.started_at || now,
           last_saved_at: now,
-          completed_at: responseData.completed ? (existingStageAttempt?.completed_at || now) : null,
-          response_data_json: responseData,
-          score: responseData.score ?? null,
-          max_score: responseData.maxScore ?? null,
-          feedback_json: responseData.feedback ?? null,
-          created_at: existingStageAttempt?.created_at || now,
+          completed_at: saData.completed_at || existing?.completed_at || null,
+          response_data_json: saData.responseData !== undefined ? saData.responseData : (existing?.response_data_json || null),
+          score: saData.score !== undefined ? saData.score : (existing?.score ?? null),
+          max_score: saData.maxScore !== undefined ? saData.maxScore : (existing?.max_score ?? null),
+          feedback_json: saData.feedback !== undefined ? saData.feedback : (existing?.feedback_json || null),
+          created_at: existing?.created_at || now,
           updated_at: now,
         };
       }
     }
+
+    // Recalculate progress
+    _recalculateProgress(store, attempt, now);
 
     // Log auto-save event
     _logEvent(store, attemptId, 'AUTO_SAVED', {
@@ -352,10 +474,14 @@
       stagesCompleted: completionData.stagesCompleted || [],
       exerciseScores: completionData.exerciseScores || {},
       dialogueCompleted: completionData.dialogueCompleted || false,
+      dialoguePartBCompleted: completionData.dialoguePartBCompleted || false,
+      dialogueChoices: completionData.dialogueChoices || [],
+      dialogueFrames: completionData.dialogueFrames || {},
       infoGapCompleted: completionData.infoGapCompleted || false,
       transferScenarioId: completionData.transferScenarioId || null,
       transferScenarioTitle: completionData.transferScenarioTitle || null,
       rubricScores: completionData.rubricScores || {},
+      rubricEvidence: completionData.rubricEvidence || {},
     };
 
     // Store scenario_instance (snapshot of the exact scenario the learner saw)
@@ -376,7 +502,6 @@
         created_at: now,
       };
 
-      // Store scenario_attempt (learner's responses to the scenario)
       store.scenario_attempts[instanceId] = {
         id: `sca-${attemptId}-transfer`,
         organization_id: ORG_ID,
@@ -420,7 +545,10 @@
         lesson_attempt_id: attemptId,
         learner_id: LEARNER_ID,
         status: 'COMPLETED',
-        response_data_json: { choices: completionData.dialogueChoices || [] },
+        response_data_json: {
+          choices: completionData.dialogueChoices || [],
+          frames: completionData.dialogueFrames || {},
+        },
         submitted_at: now,
         completed_at: now,
         score: null,
@@ -440,7 +568,6 @@
     assignment.status = 'COMPLETED';
     assignment.completed_at = now;
     assignment.updated_at = now;
-    // Note: current_attempt_id stays set so we can reference the last attempt
 
     // Log completion event
     _logEvent(store, attemptId, 'ATTEMPT_COMPLETED', {
@@ -459,17 +586,12 @@
    */
   function startNewAttempt() {
     const store = getStore();
-    const assignment = store.learner_assignments[LESSON_ID];
-
-    // Verify the lesson has been attempted before
     const prev = Object.values(store.lesson_attempts).filter(
       a => a.lesson_id === LESSON_ID && a.learner_id === LEARNER_ID
     );
     if (prev.length === 0) {
       console.warn('[LX persist] No previous attempts to restart from.');
     }
-
-    // Create a fresh attempt — old attempts are untouched
     const attempt = createAttempt();
     return attempt;
   }
@@ -617,6 +739,12 @@
     return store.stage_attempts[attemptId] || {};
   }
 
+  /** Get a single stage attempt. */
+  function getStageAttempt(attemptId, stageKey) {
+    const store = getStore();
+    return (store.stage_attempts[attemptId] || {})[stageKey] || null;
+  }
+
   /** Get review events for an attempt, sorted by scheduled_for. */
   function getReviewEvents(attemptId) {
     const store = getStore();
@@ -704,11 +832,17 @@
 
   // ── RESULT BAND ──
   function getResultBandLabel(band) {
-    return { RETEACH: 'Reteach', DEVELOPING: 'Developing', SECURE: 'Secure', STRONG: 'Strong' }[band] || band || '—';
+    return {
+      RETEACH: 'Reteach', EMERGING: 'Emerging',
+      DEVELOPING: 'Developing', SECURE: 'Secure', STRONG: 'Strong'
+    }[band] || band || '—';
   }
 
   function getResultBandColor(band) {
-    return { RETEACH: '#DC2626', DEVELOPING: '#D97706', SECURE: '#16A34A', STRONG: '#0369A1' }[band] || '#475569';
+    return {
+      RETEACH: '#DC2626', EMERGING: '#F59E0B',
+      DEVELOPING: '#D97706', SECURE: '#16A34A', STRONG: '#0369A1'
+    }[band] || '#475569';
   }
 
   // ── PUBLIC API ──
@@ -718,6 +852,7 @@
     getOrCreateActiveAttempt,
     createAttempt,
     startNewAttempt,
+    updateStageAttempt,   // PRIMARY: Phase 1.5.1 central function
     saveProgress,
     completeAttempt,
     logStageChange,
@@ -726,6 +861,7 @@
     getAllAttempts,
     getAttempt,
     getStageAttempts,
+    getStageAttempt,
     getReviewEvents,
     getAllReviewEvents,
     getAssignment,
@@ -740,8 +876,10 @@
     getResultBandLabel,
     getResultBandColor,
     // Constants
+    STAGE_STATUS,
     INSTRUCTIONAL_STAGE_KEYS,
     INSTRUCTIONAL_STAGE_COUNT,
+    EVIDENCE_STAGE_KEYS,
     LESSON_ID,
     LEARNER_ID,
     ORG_ID,
