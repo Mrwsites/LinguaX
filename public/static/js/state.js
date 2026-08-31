@@ -636,16 +636,22 @@
   // ── MARK STAGE COMPLETE (legacy path, used by Next Stage button) ──
   function markStageComplete(stageKey) {
     if (!stageKey) return;
-    // Informational stages that have no assessed activity → VIEWED
-    const infoStages = ['overview', 'review', 'feedback'];
-    if (infoStages.includes(stageKey)) {
-      updateStageStatus(stageKey, { status: SS.VIEWED });
-    } else {
-      const current = getStageStatus(stageKey);
-      // Don't downgrade
-      if ([SS.COMPLETED, SS.NEEDS_REVIEW, SS.ATTEMPTED].includes(current)) return;
-      updateStageStatus(stageKey, { status: SS.COMPLETED });
+    const current = getStageStatus(stageKey);
+    // Never downgrade an already-assessed stage
+    if ([SS.COMPLETED, SS.NEEDS_REVIEW, SS.ATTEMPTED].includes(current)) {
+      scheduleAutoSave();
+      return;
     }
+    // Informational/nav stages → VIEWED (not scored)
+    const viewedOnlyStages = ['overview', 'review', 'feedback'];
+    if (viewedOnlyStages.includes(stageKey)) {
+      updateStageStatus(stageKey, { status: SS.VIEWED });
+    } else if (current === SS.NOT_STARTED || current === SS.VIEWED) {
+      // If learner clicked Next without doing the activity — mark as VIEWED only
+      // so it shows as "visited" but not "completed"
+      updateStageStatus(stageKey, { status: SS.VIEWED });
+    }
+    // IN_PROGRESS stages remain IN_PROGRESS until learner submits
     scheduleAutoSave();
   }
 

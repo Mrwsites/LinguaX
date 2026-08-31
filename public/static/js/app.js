@@ -413,11 +413,8 @@
   function renderLessonSidebar() {
     const lesson = LX.lesson_A1_001;
     const prog = LX.getInstructionalProgress();
+    const ev = LX.getEvidenceProgress();
     const sidebar = el('div', 'lesson-sidebar');
-
-    const stagesSource = st.isReadOnly && st.readOnlyAttemptId
-      ? _buildReadOnlyStageCompletion()
-      : null;
 
     const map = el('div', 'lesson-map');
     map.innerHTML = `
@@ -425,45 +422,21 @@
     <div class="lesson-map-obj" style="font-size:12px;color:var(--accent);font-weight:600">A1 · ${lesson.estimatedMinutes} min</div>
     <div class="lesson-map-obj">${lesson.objective}</div>
     <div style="margin:8px 0;padding:8px 10px;background:var(--grey-bg);border-radius:6px;font-size:12px;color:var(--grey)">
-      ${prog.pct >= 100
-        ? '<span style="color:var(--green);font-weight:700">✓ Lesson complete</span>'
-        : `${prog.count} of ${prog.total} learning stages · ${prog.pct}%`}
+      <div id="lx-progress-count">${prog.count} of ${prog.total} learning stages</div>
+      <div class="progress-bar" style="margin:4px 0;height:4px">
+        <div class="progress-fill" id="lx-progress-bar-fill" style="width:${prog.pct}%;background:var(--accent);height:4px;border-radius:2px"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span id="lx-progress-pct">${prog.pct}%</span>
+        <span id="lx-evidence-count" style="color:var(--teal)">Evidence: ${ev.count} of ${ev.total}</span>
+      </div>
     </div>
     <div class="divider"></div>
     <div class="stage-list" id="stage-list">
-      ${LX.STAGES.map((s, i) => {
-        const isActive = i === st.currentStage;
-        const isDone = stagesSource ? stagesSource.has(s.id) : st.stagesCompleted.has(s.id);
-        const isInstructional = LX.INSTRUCTIONAL_STAGE_KEYS.includes(s.id);
-        let cls = 'stage-item';
-        if (isActive) cls += ' active';
-        if (isDone) cls += ' completed-stage';
-        const isLocked = !st.isReadOnly && i > 0 && !st.stagesCompleted.has(LX.STAGES[i-1]?.id) && !isActive && !isDone;
-        return `
-        <div class="${cls}" data-stage="${i}" ${isLocked ? 'style="opacity:0.45;pointer-events:none"' : ''}>
-          <div class="stage-num ${isActive ? 'stage-num-active' : isDone ? 'stage-num-done' : 'stage-num-default'}">
-            ${isDone ? '✓' : i + 1}
-          </div>
-          <div class="stage-info">
-            <div class="stage-label">${s.label}</div>
-            <div class="stage-sublabel">${s.tag}${isInstructional ? '' : ''}</div>
-          </div>
-          ${isActive ? '<span style="font-size:12px">▶</span>' : ''}
-          ${isDone ? '<span class="stage-check">✓</span>' : ''}
-        </div>`;
-      }).join('')}
+      ${LX._buildSidebarItems()}
     </div>`;
     sidebar.appendChild(map);
     return sidebar;
-  }
-
-  function _buildReadOnlyStageCompletion() {
-    const stageAttempts = P.getStageAttempts(st.readOnlyAttemptId);
-    return new Set(
-      Object.entries(stageAttempts)
-        .filter(([, sa]) => sa.status === 'COMPLETED')
-        .map(([key]) => key)
-    );
   }
 
   function renderLessonHeader() {
@@ -535,6 +508,9 @@
   // ── STAGE 0: OVERVIEW ──
   function renderOverviewStage() {
     const lesson = LX.lesson_A1_001;
+    // Mark as viewed when opened
+    if (!st.isReadOnly) LX.markStageViewed('overview');
+
     const stagesHtml = LX.STAGES.slice(1, -1).map((s, i) => `
       <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
         <span style="width:28px;height:28px;border-radius:50%;background:var(--accent-light);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${i + 1}</span>
@@ -564,6 +540,11 @@
       </div>
       <div style="font-size:13px;font-weight:700;color:var(--grey);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px">What you will do in this lesson (${P.INSTRUCTIONAL_STAGE_COUNT} stages):</div>
       ${stagesHtml}
+      ${!st.isReadOnly ? `
+      <div style="margin-top:24px;padding:16px;background:var(--accent-light);border-radius:var(--radius-md);border:1px solid var(--accent);text-align:center">
+        <div style="font-size:13px;color:var(--navy);margin-bottom:12px"><strong>Ready to begin?</strong> Click below to confirm your objective and start the lesson.</div>
+        <button class="btn-start" id="begin-lesson-btn" style="margin:0 auto">✓ I understand the objective — Begin Lesson →</button>
+      </div>` : ''}
     </div>`;
 
     const card = el('div', 'section-card');
@@ -579,6 +560,15 @@
   // ── STAGE 1: VISUAL TIME ──
   function renderVisualStage() {
     const vt = LX.lesson_A1_001.visualTime;
+    const cs = st.stageCheckState.visual;
+    const readOnly = st.isReadOnly;
+
+    // Mark as viewed when opened (if not already assessed)
+    if (!readOnly) {
+      const cur = LX.getStageStatus('visual');
+      if (cur === 'NOT_STARTED') LX.updateStageStatus('visual', { status: 'IN_PROGRESS' });
+    }
+
     const visualsHtml = vt.visuals.map(v => {
       const sent = v.sentence.replace(`{${v.highlight}}`, `<strong style="color:var(--accent)">${v.highlight}</strong>`);
       return `<div class="visual-card">
@@ -591,6 +581,35 @@
       `<span class="visual-chip${m.highlight ? ' highlight' : ''}">${m.text}</span>`
     ).join('');
 
+    // Quick-check questions (is or are?)
+    const qItems = [
+      { q: 'The bag ___ black.', options: ['is', 'are'], answer: 'is', explanation: 'Use <em>is</em> with a singular noun (the bag).' },
+      { q: 'The keys ___ on the desk.', options: ['is', 'are'], answer: 'are', explanation: 'Use <em>are</em> with a plural noun (keys).' },
+      { q: 'This ___ my umbrella.', options: ['is', 'are'], answer: 'is', explanation: 'Use <em>is</em> after <em>this</em> (singular).' },
+      { q: 'These ___ her glasses.', options: ['is', 'are'], answer: 'are', explanation: 'Use <em>are</em> after <em>these</em> (plural).' },
+    ];
+
+    const qHtml = qItems.map((q, i) => {
+      const saved = cs.answers[i];
+      const checked = cs.submitted;
+      const opts = q.options.map(opt => {
+        let cls = 'choice-btn';
+        if (checked) {
+          if (opt === q.answer) cls += ' correct-choice';
+          else if (opt === saved && opt !== q.answer) cls += ' wrong-choice';
+        }
+        if (opt === saved) cls += ' chosen';
+        return `<button class="${cls}" data-check="visual" data-item="${i}" data-opt="${opt}" ${(checked || readOnly) ? 'disabled' : ''}>${opt}</button>`;
+      }).join('');
+      const fb = checked
+        ? `<div class="exercise-feedback show ${saved === q.answer ? 'correct-fb' : 'incorrect-fb'}" style="margin-top:6px">${saved === q.answer ? '✅ Correct!' : `❌ Answer: <em>${q.answer}</em>`} — ${q.explanation}</div>`
+        : '';
+      return `<div style="margin-bottom:12px;padding:10px 14px;background:var(--white);border-radius:8px;border:1px solid var(--border)">
+        <div style="font-size:14px;margin-bottom:8px">${i+1}. <em>${q.q}</em></div>
+        <div class="choice-buttons">${opts}</div>${fb}
+      </div>`;
+    }).join('');
+
     const bodyHTML = `
     <div class="visual-time-grid">
       ${visualsHtml}
@@ -599,7 +618,13 @@
         <div class="visual-map-content">${mapItems}</div>
       </div>
     </div>
-    <div style="padding:0 24px 20px;font-size:13px;color:var(--grey);text-align:center;font-style:italic">"${vt.tagline}"</div>`;
+    <div style="padding:0 24px 20px;font-size:13px;color:var(--grey);text-align:center;font-style:italic">"${vt.tagline}"</div>
+    <div style="padding:0 24px 24px">
+      <div style="font-size:13px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px">👁️ Quick Check — is or are?</div>
+      ${qHtml}
+      ${!readOnly && !cs.submitted ? `<button class="btn-check" id="check-visual-stage">Check answers</button>` : ''}
+      ${cs.submitted ? `<div class="exercise-feedback show ${cs.score >= 3 ? 'correct-fb' : 'incorrect-fb'}">Score: ${cs.score}/${qItems.length} — ${cs.score >= 3 ? 'Great visual observation!' : 'Review the visual cards above and try again.'}</div>` : ''}
+    </div>`;
 
     return sectionCard('#5B61F6', vt.stage, `${vt.label}: ${vt.tagline}`, bodyHTML, navButtons(1));
   }
@@ -607,6 +632,14 @@
   // ── STAGE 2: GRAMMAR FOCUS ──
   function renderGrammarStage() {
     const gf = LX.lesson_A1_001.grammarFocus;
+    const cs = st.stageCheckState.grammar;
+    const readOnly = st.isReadOnly;
+
+    if (!readOnly) {
+      const cur = LX.getStageStatus('grammar');
+      if (cur === 'NOT_STARTED') LX.updateStageStatus('grammar', { status: 'IN_PROGRESS' });
+    }
+
     const errorsSection = gf.sections.find(s => s.type === 'errors');
     const otherSections = gf.sections.filter(s => s.type !== 'errors');
 
@@ -635,6 +668,34 @@
         <td class="question">${r.question}</td>
       </tr>`).join('');
 
+    // 3-question is/are quick check
+    const qItems = [
+      { q: 'Choose the correct form: "It ___ a blue bag."', options: ['is', 'are', "isn't"], answer: 'is', explanation: '<em>It</em> is singular → use <em>is</em>.' },
+      { q: 'Choose the correct form: "___ these your keys?"', options: ['Is', 'Are', "Isn't"], answer: 'Are', explanation: '<em>These</em> is plural → use <em>Are</em>.' },
+      { q: 'Choose the correct form: "The glasses ___ not mine."', options: ['is', 'are', 'be'], answer: 'are', explanation: '<em>Glasses</em> is plural → use <em>are</em>.' },
+    ];
+
+    const qHtml = qItems.map((q, i) => {
+      const saved = cs.answers[i];
+      const checked = cs.submitted;
+      const opts = q.options.map(opt => {
+        let cls = 'choice-btn';
+        if (checked) {
+          if (opt === q.answer) cls += ' correct-choice';
+          else if (opt === saved && opt !== q.answer) cls += ' wrong-choice';
+        }
+        if (opt === saved) cls += ' chosen';
+        return `<button class="${cls}" data-check="grammar" data-item="${i}" data-opt="${opt}" ${(checked || readOnly) ? 'disabled' : ''}>${opt}</button>`;
+      }).join('');
+      const fb = checked
+        ? `<div class="exercise-feedback show ${saved === q.answer ? 'correct-fb' : 'incorrect-fb'}" style="margin-top:6px">${saved === q.answer ? '✅ Correct!' : `❌ Answer: <em>${q.answer}</em>`} — ${q.explanation}</div>`
+        : '';
+      return `<div style="margin-bottom:12px;padding:10px 14px;background:var(--white);border-radius:8px;border:1px solid var(--border)">
+        <div style="font-size:14px;margin-bottom:8px">${i+1}. ${q.q}</div>
+        <div class="choice-buttons">${opts}</div>${fb}
+      </div>`;
+    }).join('');
+
     const bodyHTML = `
     <div class="grammar-section-body">
       <div class="grammar-name-tag">📐 ${gf.grammarName}</div>
@@ -646,6 +707,12 @@
           <thead><tr><th>Subject</th><th>✓ Positive</th><th>✗ Negative</th><th>? Question</th></tr></thead>
           <tbody>${tableRows}</tbody>
         </table>
+      </div>
+      <div style="margin-top:24px;padding:16px;background:var(--purple-light);border-radius:var(--radius-md);border:1px solid var(--purple)">
+        <div style="font-size:13px;font-weight:700;color:var(--purple);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px">📐 Quick Check — is / are / are not</div>
+        ${qHtml}
+        ${!readOnly && !cs.submitted ? `<button class="btn-check" id="check-grammar-stage">Check answers</button>` : ''}
+        ${cs.submitted ? `<div class="exercise-feedback show ${cs.score >= 2 ? 'correct-fb' : 'incorrect-fb'}">Score: ${cs.score}/${qItems.length} — ${cs.score >= 2 ? 'Good understanding of verb to be!' : 'Review the grammar table above.'}</div>` : ''}
       </div>
     </div>`;
     return sectionCard('#7C3AED', gf.stage, `${gf.label}: ${gf.tagline}`, bodyHTML, navButtons(2));
@@ -697,7 +764,53 @@
       </div>`;
     }).join('');
 
-    const bodyHTML = `<div class="core-sentence-body"><div style="font-size:13px;color:var(--grey);margin-bottom:20px;font-style:italic">${cs.tagline}</div>${sentencesHtml}</div>`;
+    const csc = st.stageCheckState.coresentence;
+    const readOnly = st.isReadOnly;
+
+    if (!readOnly) {
+      const cur = LX.getStageStatus('coresentence');
+      if (cur === 'NOT_STARTED') LX.updateStageStatus('coresentence', { status: 'IN_PROGRESS' });
+    }
+
+    // Identify: which word is the subject, verb, description?
+    const qItems = [
+      { sentence: '"This bag is black."', part: 'What is the <strong>verb</strong>?', options: ['This', 'is', 'black', 'bag'], answer: 'is', explanation: '<em>is</em> is the verb (present tense of "to be").' },
+      { sentence: '"The keys are on the desk."', part: 'What is the <strong>subject</strong>?', options: ['The', 'keys', 'are', 'desk'], answer: 'keys', explanation: '<em>keys</em> is the subject — the thing we are describing.' },
+      { sentence: '"It is Sarah\'s umbrella."', part: 'What shows <strong>possession</strong>?', options: ["Sarah's", 'is', 'umbrella', 'It'], answer: "Sarah's", explanation: "The apostrophe + s (<em>'s</em>) shows the umbrella belongs to Sarah." },
+    ];
+
+    const qHtml = qItems.map((q, i) => {
+      const saved = csc.answers[i];
+      const checked = csc.submitted;
+      const opts = q.options.map(opt => {
+        let cls = 'choice-btn';
+        if (checked) {
+          if (opt === q.answer) cls += ' correct-choice';
+          else if (opt === saved && opt !== q.answer) cls += ' wrong-choice';
+        }
+        if (opt === saved) cls += ' chosen';
+        return `<button class="${cls}" data-check="coresentence" data-item="${i}" data-opt="${opt}" ${(checked || readOnly) ? 'disabled' : ''}>${opt}</button>`;
+      }).join('');
+      const fb = checked
+        ? `<div class="exercise-feedback show ${saved === q.answer ? 'correct-fb' : 'incorrect-fb'}" style="margin-top:6px">${saved === q.answer ? '✅ Correct!' : `❌ Answer: <em>${q.answer}</em>`} — ${q.explanation}</div>`
+        : '';
+      return `<div style="margin-bottom:12px;padding:10px 14px;background:var(--white);border-radius:8px;border:1px solid var(--border)">
+        <div style="font-size:13px;color:var(--grey);margin-bottom:4px">Sentence: <strong>${q.sentence}</strong></div>
+        <div style="font-size:14px;margin-bottom:8px">${q.part}</div>
+        <div class="choice-buttons">${opts}</div>${fb}
+      </div>`;
+    }).join('');
+
+    const bodyHTML = `<div class="core-sentence-body">
+      <div style="font-size:13px;color:var(--grey);margin-bottom:20px;font-style:italic">${cs.tagline}</div>
+      ${sentencesHtml}
+      <div style="margin-top:24px;padding:16px;background:var(--teal-light,#e0f7f4);border-radius:var(--radius-md);border:1px solid var(--teal)">
+        <div style="font-size:13px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px">🔑 Identify the Part</div>
+        ${qHtml}
+        ${!readOnly && !csc.submitted ? `<button class="btn-check" id="check-coresentence-stage">Check answers</button>` : ''}
+        ${csc.submitted ? `<div class="exercise-feedback show ${csc.score >= 2 ? 'correct-fb' : 'incorrect-fb'}">Score: ${csc.score}/${qItems.length} — ${csc.score >= 2 ? 'You can identify sentence parts!' : 'Review the sentence breakdown tables above.'}</div>` : ''}
+      </div>
+    </div>`;
     return sectionCard('#0D9488', cs.stage, `${cs.label}: ${cs.tagline}`, bodyHTML, navButtons(3));
   }
 
@@ -726,7 +839,53 @@
       </div>`;
     }).join('');
 
-    const bodyHTML = `<div class="vocab-section-body"><div style="font-size:13px;color:var(--grey);margin-bottom:20px;font-style:italic">${vocab.tagline}</div>${groupsHtml}</div>`;
+    const vc = st.stageCheckState.vocabulary;
+    const readOnly = st.isReadOnly;
+
+    if (!readOnly) {
+      const cur = LX.getStageStatus('vocabulary');
+      if (cur === 'NOT_STARTED') LX.updateStageStatus('vocabulary', { status: 'IN_PROGRESS' });
+    }
+
+    // Word-to-meaning match
+    const qItems = [
+      { word: 'lost property', options: ['a place for forgotten items', 'a type of bag', 'a question word', 'a colour'], answer: 'a place for forgotten items', explanation: '<em>Lost property</em> is the office/area where forgotten items are kept.' },
+      { word: 'belong', options: ['to be heavy', 'to be owned by someone', 'to be lost', 'to be found'], answer: 'to be owned by someone', explanation: '<em>Belong</em> means to be the property of a person.' },
+      { word: 'describe', options: ['to ask a question', 'to say what something looks like', 'to find something', 'to give something back'], answer: 'to say what something looks like', explanation: '<em>Describe</em> = say what colour, size, type something is.' },
+      { word: 'claim', options: ['to lose something', 'to hide something', 'to say something is yours', 'to give something away'], answer: 'to say something is yours', explanation: '<em>Claim</em> = say that something belongs to you.' },
+    ];
+
+    const qHtml = qItems.map((q, i) => {
+      const saved = vc.answers[i];
+      const checked = vc.submitted;
+      const opts = q.options.map(opt => {
+        let cls = 'choice-btn';
+        if (checked) {
+          if (opt === q.answer) cls += ' correct-choice';
+          else if (opt === saved && opt !== q.answer) cls += ' wrong-choice';
+        }
+        if (opt === saved) cls += ' chosen';
+        return `<button class="${cls}" data-check="vocabulary" data-item="${i}" data-opt="${opt}" ${(checked || readOnly) ? 'disabled' : ''}>${opt}</button>`;
+      }).join('');
+      const fb = checked
+        ? `<div class="exercise-feedback show ${saved === q.answer ? 'correct-fb' : 'incorrect-fb'}" style="margin-top:6px">${saved === q.answer ? '✅ Correct!' : `❌ Answer: <em>${q.answer}</em>`} — ${q.explanation}</div>`
+        : '';
+      return `<div style="margin-bottom:12px;padding:10px 14px;background:var(--white);border-radius:8px;border:1px solid var(--border)">
+        <div style="font-size:14px;margin-bottom:8px">${i+1}. What does <strong>"${q.word}"</strong> mean?</div>
+        <div class="choice-buttons">${opts}</div>${fb}
+      </div>`;
+    }).join('');
+
+    const bodyHTML = `<div class="vocab-section-body">
+      <div style="font-size:13px;color:var(--grey);margin-bottom:20px;font-style:italic">${vocab.tagline}</div>
+      ${groupsHtml}
+      <div style="margin-top:24px;padding:16px;background:var(--amber-light);border-radius:var(--radius-md);border:1px solid var(--amber)">
+        <div style="font-size:13px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px">📖 Word-to-Meaning Match</div>
+        ${qHtml}
+        ${!readOnly && !vc.submitted ? `<button class="btn-check" id="check-vocabulary-stage">Check answers</button>` : ''}
+        ${vc.submitted ? `<div class="exercise-feedback show ${vc.score >= 3 ? 'correct-fb' : 'incorrect-fb'}">Score: ${vc.score}/${qItems.length} — ${vc.score >= 3 ? 'Good vocabulary knowledge!' : 'Review the word table above.'}</div>` : ''}
+      </div>
+    </div>`;
     return sectionCard('#D97706', vocab.stage, `${vocab.label}: ${vocab.tagline}`, bodyHTML, navButtons(4));
   }
 
@@ -755,7 +914,53 @@
       </div>`;
     }).join('');
 
-    const bodyHTML = `<div class="phrases-body"><div style="font-size:13px;color:var(--grey);margin-bottom:20px;font-style:italic">${phrases.tagline}</div>${groupsHtml}</div>`;
+    const pc = st.stageCheckState.phrases;
+    const readOnly = st.isReadOnly;
+
+    if (!readOnly) {
+      const cur = LX.getStageStatus('phrases');
+      if (cur === 'NOT_STARTED') LX.updateStageStatus('phrases', { status: 'IN_PROGRESS' });
+    }
+
+    // Select correct sentence for a communication function
+    const qItems = [
+      { function: 'Ask if a bag belongs to someone', options: ['Is this your bag?', 'It is a bag.', 'The bag is mine.', 'Are bag you?'], answer: 'Is this your bag?', explanation: 'Invert <em>is</em> before <em>this</em> to form a yes/no question.' },
+      { function: 'Say the keys do not belong to you', options: ['The keys is not mine.', 'Keys not mine.', 'The keys are not mine.', 'Are the keys mine?'], answer: 'The keys are not mine.', explanation: 'Use <em>are not</em> with plural subject <em>the keys</em>.' },
+      { function: 'Describe who owns the umbrella', options: ["It is Sarah's umbrella.", "It are Sarah umbrella.", "Sarah umbrella is it.", "Umbrella is Sarah."], answer: "It is Sarah's umbrella.", explanation: "Use <em>is</em> + name + <em>'s</em> for singular possession." },
+    ];
+
+    const qHtml = qItems.map((q, i) => {
+      const saved = pc.answers[i];
+      const checked = pc.submitted;
+      const opts = q.options.map(opt => {
+        let cls = 'choice-btn';
+        if (checked) {
+          if (opt === q.answer) cls += ' correct-choice';
+          else if (opt === saved && opt !== q.answer) cls += ' wrong-choice';
+        }
+        if (opt === saved) cls += ' chosen';
+        return `<button class="${cls}" data-check="phrases" data-item="${i}" data-opt="${opt}" ${(checked || readOnly) ? 'disabled' : ''}>${opt}</button>`;
+      }).join('');
+      const fb = checked
+        ? `<div class="exercise-feedback show ${saved === q.answer ? 'correct-fb' : 'incorrect-fb'}" style="margin-top:6px">${saved === q.answer ? '✅ Correct!' : `❌ Answer: <em>${q.answer}</em>`} — ${q.explanation}</div>`
+        : '';
+      return `<div style="margin-bottom:12px;padding:10px 14px;background:var(--white);border-radius:8px;border:1px solid var(--border)">
+        <div style="font-size:13px;color:var(--grey);margin-bottom:6px">Function: <em>${q.function}</em></div>
+        <div style="font-size:14px;font-weight:600;margin-bottom:8px">Select the correct sentence:</div>
+        <div class="choice-buttons" style="flex-direction:column;align-items:flex-start">${opts}</div>${fb}
+      </div>`;
+    }).join('');
+
+    const bodyHTML = `<div class="phrases-body">
+      <div style="font-size:13px;color:var(--grey);margin-bottom:20px;font-style:italic">${phrases.tagline}</div>
+      ${groupsHtml}
+      <div style="margin-top:24px;padding:16px;background:var(--green-light);border-radius:var(--radius-md);border:1px solid var(--green)">
+        <div style="font-size:13px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px">💬 Select the Right Sentence</div>
+        ${qHtml}
+        ${!readOnly && !pc.submitted ? `<button class="btn-check" id="check-phrases-stage">Check answers</button>` : ''}
+        ${pc.submitted ? `<div class="exercise-feedback show ${pc.score >= 2 ? 'correct-fb' : 'incorrect-fb'}">Score: ${pc.score}/${qItems.length} — ${pc.score >= 2 ? 'You can use these sentences correctly!' : 'Review the useful sentences above.'}</div>` : ''}
+      </div>
+    </div>`;
     return sectionCard('#2D7E5E', phrases.stage, `${phrases.label}: ${phrases.tagline}`, bodyHTML, navButtons(5));
   }
 
@@ -912,47 +1117,105 @@
     const ds = st.dialogueState;
     const readOnly = st.isReadOnly;
 
-    const turnsToShow = gd.dialogue.slice(0, Math.max(1, ds.currentTurn + 1));
-    const turnsHtml = turnsToShow.map((turn, i) => {
-      const isStudent = turn.speaker === 'student';
-      if (turn.text) {
-        return `
-        <div class="dialogue-turn ${isStudent ? 'student' : ''}">
-          <div class="dialogue-avatar ${isStudent ? 'avatar-student' : 'avatar-partner'}">${isStudent ? 'You' : 'P'}</div>
-          <div>
-            <div class="dialogue-speaker">${isStudent ? 'You (Lost Property Officer)' : 'Passenger'}</div>
-            <div class="dialogue-bubble ${isStudent ? 'bubble-student' : 'bubble-partner'}">${turn.text}</div>
-          </div>
-        </div>`;
-      }
-      const chosen = ds.choices[i];
-      if (chosen !== undefined) {
-        return `
-        <div class="dialogue-turn student">
-          <div class="dialogue-avatar avatar-student">You</div>
-          <div>
-            <div class="dialogue-speaker">You (Lost Property Officer)</div>
-            <div class="dialogue-bubble bubble-student">${chosen}</div>
-          </div>
-        </div>`;
-      }
-      if (!readOnly && i === ds.currentTurn) {
-        const opts = turn.options.map((opt, oi) =>
-          `<button class="response-option" data-turn="${i}" data-opt="${oi}">${opt}</button>`
-        ).join('');
-        return `
-        <div style="padding:12px;background:var(--accent-light);border-radius:var(--radius-md);border:1.5px solid var(--accent)">
-          <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:10px">YOUR TURN — ${turn.prompt}</div>
-          <div class="response-options">${opts}</div>
-          <div id="dialogue-feedback-${i}" class="exercise-feedback" style="margin-top:8px"></div>
-        </div>`;
-      }
-      return '';
-    }).join('');
+    if (!readOnly) {
+      const cur = LX.getStageStatus('dialogue');
+      if (cur === 'NOT_STARTED') LX.updateStageStatus('dialogue', { status: 'IN_PROGRESS' });
+    }
 
     const checklistHtml = gd.successChecklist.map(item =>
       `<div class="checklist-item"><span class="checklist-check">${ds.completed ? '✅' : '○'}</span>${item}</div>`
     ).join('');
+
+    // ── Part A: Choose the best response ──
+    const partAItems = [
+      {
+        context: 'A passenger approaches. They look worried.',
+        partnerSays: '"Excuse me, I think I left my bag on the train."',
+        prompt: 'What do you say as the Lost Property Officer?',
+        options: [
+          'Is this your bag? It is black.',
+          'OK, goodbye.',
+          'Are you lost?',
+          'The bag is very nice.',
+        ],
+        answer: 'Is this your bag? It is black.',
+        explanation: 'Use <em>Is this your bag?</em> (yes/no question with <em>is</em>) to confirm and describe the item.',
+      },
+      {
+        context: 'You have found a pair of glasses and some keys.',
+        partnerSays: '"I am looking for my glasses and my keys."',
+        prompt: 'What do you say?',
+        options: [
+          'The glasses and keys is here.',
+          'Are these your glasses? And are these your keys?',
+          'Is these your glasses?',
+          'Glasses are belong to you?',
+        ],
+        answer: 'Are these your glasses? And are these your keys?',
+        explanation: '<em>Are these…?</em> is correct for plural items. Use <em>are</em>, not <em>is</em>.',
+      },
+      {
+        context: 'The passenger confirms the glasses are theirs but the keys are not.',
+        partnerSays: '"The glasses are mine, but the keys are not mine."',
+        prompt: 'You confirm: whose keys are they?',
+        options: [
+          "They are not yours. It is the teacher's keys.",
+          "They are not yours. They are the teacher's keys.",
+          "They isn't yours. Keys is teacher.",
+          "Keys are not you. Teacher key.",
+        ],
+        answer: "They are not yours. They are the teacher's keys.",
+        explanation: "Use <em>are</em> for plural <em>they</em>, and <em>'s</em> for possession.",
+      },
+    ];
+
+    const partAHtml = partAItems.map((item, i) => {
+      const saved = ds.partAChoices[i];
+      const checked = ds.partAChecked;
+      const opts = item.options.map(opt => {
+        let cls = 'choice-btn';
+        if (checked) {
+          if (opt === item.answer) cls += ' correct-choice';
+          else if (opt === saved && opt !== item.answer) cls += ' wrong-choice';
+        }
+        if (opt === saved) cls += ' chosen';
+        return `<button class="${cls}" data-dialogue-a="${i}" data-opt="${opt}" ${(checked || readOnly) ? 'disabled' : ''}>${opt}</button>`;
+      }).join('');
+      const fb = checked
+        ? `<div class="exercise-feedback show ${saved === item.answer ? 'correct-fb' : 'incorrect-fb'}" style="margin-top:8px">${saved === item.answer ? '✅ Correct!' : `❌ Best answer: <em>${item.answer}</em>`} — ${item.explanation}</div>`
+        : '';
+      return `<div style="margin-bottom:16px;padding:14px 16px;background:var(--white);border-radius:8px;border:1px solid var(--border)">
+        <div style="font-size:12px;color:var(--grey);font-style:italic;margin-bottom:6px">${item.context}</div>
+        <div style="padding:10px 12px;background:var(--grey-bg);border-radius:6px;font-size:14px;margin-bottom:10px">
+          <span style="font-weight:600;color:var(--navy)">Passenger:</span> ${item.partnerSays}
+        </div>
+        <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:8px">👤 ${item.prompt}</div>
+        <div class="choice-buttons" style="flex-direction:column;align-items:flex-start">${opts}</div>${fb}
+      </div>`;
+    }).join('');
+
+    // ── Part B: Complete the dialogue frames ──
+    const partBItems = [
+      { label: 'Greet the passenger and ask if they lost something.', placeholder: 'e.g. "Hello! Is this your bag? It is blue."', hint: 'Use: Is this your ___? It is ___.' },
+      { label: 'The passenger says the umbrella is not theirs. Ask if it belongs to the teacher.', placeholder: 'e.g. "Are these the teacher\'s keys?"', hint: "Use: Is it ___'s ___?" },
+      { label: 'Confirm the bag is found and say who it belongs to.', placeholder: 'e.g. "This is Maria\'s bag. It is not yours."', hint: "Use: This is ___'s ___. It is not yours." },
+    ];
+
+    const partBHtml = partBItems.map((frame, i) => {
+      const saved = ds.partBFrames[i] || '';
+      const checked = ds.partBChecked;
+      const hasContent = saved.trim().length > 0;
+      return `<div style="margin-bottom:14px;padding:14px 16px;background:var(--white);border-radius:8px;border:1px solid var(--border)">
+        <div style="font-size:13px;font-weight:600;color:var(--navy);margin-bottom:4px">${i+1}. ${frame.label}</div>
+        <div style="font-size:12px;color:var(--grey);font-style:italic;margin-bottom:8px">Hint: ${frame.hint}</div>
+        <textarea id="frame-${i}" class="response-text-area" rows="2" placeholder="${frame.placeholder}" style="min-height:60px"
+          ${readOnly || checked ? 'readonly' : ''}>${esc(saved)}</textarea>
+        ${checked && hasContent ? `<div class="exercise-feedback show correct-fb" style="margin-top:6px">✅ Response recorded.</div>` : ''}
+        ${checked && !hasContent ? `<div class="exercise-feedback show incorrect-fb" style="margin-top:6px">❌ No response entered for this frame.</div>` : ''}
+      </div>`;
+    }).join('');
+
+    const bothDone = ds.partAChecked && ds.partBChecked;
 
     const bodyHTML = `
     <div class="scenario-body">
@@ -977,12 +1240,34 @@
           <div class="scenario-info-text">${gd.goal}</div>
         </div>
       </div>
-      <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px">💬 Dialogue:</div>
-      <div class="dialogue-area" id="dialogue-area">${turnsHtml}</div>
-      ${ds.completed ? `
+
+      <div style="margin-bottom:24px">
+        <div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px">Part A — Choose the Best Response</div>
+        <div style="font-size:12px;color:var(--grey);margin-bottom:14px;font-style:italic">Read the context and passenger's line. Choose the most correct officer response.</div>
+        ${partAHtml}
+        ${!readOnly && !ds.partAChecked
+          ? `<button class="btn-check" id="check-dialogue-partA">Check Part A</button>`
+          : ds.partAChecked
+          ? `<div class="exercise-feedback show ${ds.partAScore >= 2 ? 'correct-fb' : 'incorrect-fb'}">Part A score: ${ds.partAScore}/${partAItems.length}</div>`
+          : ''}
+      </div>
+
+      <div style="margin-bottom:24px">
+        <div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px">Part B — Complete the Dialogue Frames</div>
+        <div style="font-size:12px;color:var(--grey);margin-bottom:14px;font-style:italic">Write your own response for each situation. Use <em>is / are / 's</em> and yes/no questions.</div>
+        ${partBHtml}
+        ${!readOnly && !ds.partBChecked
+          ? `<button class="btn-check" id="check-dialogue-partB">Submit Part B</button>`
+          : ds.partBChecked
+          ? `<div class="exercise-feedback show ${ds.partBScore >= 2 ? 'correct-fb' : 'incorrect-fb'}">Part B: ${ds.partBScore}/${partBItems.length} frames completed.</div>`
+          : ''}
+      </div>
+
+      ${bothDone ? `
       <div style="margin-bottom:16px;padding:14px 16px;background:var(--green-light);border-radius:var(--radius-sm);border:1px solid var(--green);font-size:14px;font-weight:600;color:var(--green)">
-        ✅ Dialogue complete! Well done.
+        ✅ Guided Dialogue complete! Total: ${ds.partAScore + ds.partBScore}/${partAItems.length + partBItems.length}
       </div>` : ''}
+
       <div class="checklist">
         <div class="checklist-title">✓ Success Checklist</div>
         ${checklistHtml}
@@ -1127,11 +1412,22 @@
 
   // ── STAGE: FEEDBACK ──
   function renderFeedbackStage() {
+    if (!st.isReadOnly) LX.markStageViewed('feedback');
     const score = LX.autoScoreRubric();
     const band = LX.getScoreBand(score);
     const dims = LX.lesson_A1_001.rubric.dimensions;
+    const ev = LX.getEvidenceProgress();
 
     const dimsHtml = dims.map(dim => {
+      const hasEvidence = st.rubricEvidence[dim.id];
+      if (!hasEvidence) {
+        return `
+        <div class="rubric-dim">
+          <div class="rubric-dim-label">${dim.label}</div>
+          <div class="rubric-dim-score" style="color:var(--grey);font-style:italic;font-size:12px">Not assessed yet</div>
+          <div class="rubric-dim-value" style="color:var(--grey)">—/${dim.max}</div>
+        </div>`;
+      }
       const dimScore = st.rubricScores[dim.id] || 0;
       const dots = [0, 1, 2].map(d =>
         `<div class="rubric-dot${d < dimScore ? ' filled' : ''}"></div>`
@@ -1168,8 +1464,18 @@
     const bodyHTML = `
     <div class="feedback-body">
       ${attemptSavedPanel}
+      <div style="margin-bottom:16px;padding:12px 16px;background:var(--grey-bg);border-radius:var(--radius-md);display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--grey);margin-bottom:4px">LEARNING PROGRESS</div>
+          <div style="font-size:14px;font-weight:700;color:var(--accent)">${LX.getInstructionalProgress().count} of ${LX.getInstructionalProgress().total} instructional stages</div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--grey);margin-bottom:4px">EVIDENCE SUBMITTED</div>
+          <div style="font-size:14px;font-weight:700;color:var(--teal)">${ev.count} of ${ev.total} activities</div>
+        </div>
+      </div>
       <div class="rubric-score-hero">
-        <div class="rubric-score-label">Your Score</div>
+        <div class="rubric-score-label">Your Score (evidence-based)</div>
         <div><span class="rubric-score-num">${score}</span><span class="rubric-score-max"> / 16</span></div>
         <div class="rubric-score-status ${statusClass}">${band.label}</div>
       </div>
@@ -1178,6 +1484,7 @@
         <div style="font-size:14px;color:var(--navy)">${band.desc}</div>
       </div>
       <div style="font-size:13px;font-weight:700;color:var(--grey);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px">📊 Rubric Breakdown:</div>
+      <div style="font-size:12px;color:var(--grey);margin-bottom:12px;font-style:italic">Only categories with actual learner evidence are scored. Unassessed categories show "Not assessed yet".</div>
       <div class="rubric-dimensions">${dimsHtml}</div>
       <div class="feedback-text-block">
         <div class="feedback-text-title">💬 Feedback</div>
@@ -2086,20 +2393,13 @@
       });
     }
 
-    // Stage navigation
+    // Stage navigation — use central navigateToStage from state.js
     $$('[data-stage]').forEach(item => {
       if (item.classList.contains('stage-item')) {
         item.addEventListener('click', () => {
+          if (item.classList.contains('stage-locked')) return;
           const idx = parseInt(item.dataset.stage);
-          const fromStage = LX.STAGES[st.currentStage]?.id;
-          const toStage = LX.STAGES[idx]?.id;
-          st.currentStage = idx;
-          if (st.currentAttemptId && !st.isReadOnly && fromStage !== toStage) {
-            P.logStageChange(st.currentAttemptId, fromStage, toStage);
-            LX.performAutoSave();
-          }
-          render();
-          window.scrollTo(0, 0);
+          LX._navigateToStage(idx);
         });
       }
     });
@@ -2166,6 +2466,7 @@
       btn.addEventListener('click', () => {
         if (st.isReadOnly) return;
         const stageId = btn.dataset.stage;
+        if (!stageId) return; // skip data-check buttons
         const itemIdx = parseInt(btn.dataset.item);
         const opt = btn.dataset.opt;
         const key = toCamel(stageId);
@@ -2174,6 +2475,11 @@
         $$(`[data-stage="${stageId}"][data-item="${itemIdx}"]`).forEach(b => b.classList.remove('chosen'));
         btn.classList.add('chosen');
         enableCheck(stageId);
+        // Mark practice as IN_PROGRESS when first answer given
+        const practiceStatus = LX.getStageStatus('practice');
+        if (practiceStatus === 'NOT_STARTED' || practiceStatus === 'VIEWED') {
+          LX.updateStageStatus('practice', { status: 'IN_PROGRESS' });
+        }
         LX.scheduleAutoSave();
       });
     });
@@ -2187,6 +2493,11 @@
         const key = toCamel(stageId);
         if (!st.exerciseState[key]) st.exerciseState[key] = { answers: {}, checked: false, score: 0, total: 0 };
         st.exerciseState[key].answers[itemIdx] = input.value;
+        // Mark practice as IN_PROGRESS on first input
+        const practiceStatus = LX.getStageStatus('practice');
+        if (practiceStatus === 'NOT_STARTED' || practiceStatus === 'VIEWED') {
+          LX.updateStageStatus('practice', { status: 'IN_PROGRESS' });
+        }
         LX.scheduleAutoSave();
       });
     });
@@ -2195,47 +2506,130 @@
       btn.addEventListener('click', () => {
         const id = btn.id.replace('check-', '');
         if (id === 'infogap') { checkInfoGap(); return; }
+        if (id === 'visual-stage') { checkStageActivity('visual'); return; }
+        if (id === 'grammar-stage') { checkStageActivity('grammar'); return; }
+        if (id === 'coresentence-stage') { checkStageActivity('coresentence'); return; }
+        if (id === 'vocabulary-stage') { checkStageActivity('vocabulary'); return; }
+        if (id === 'phrases-stage') { checkStageActivity('phrases'); return; }
         checkExercise(id);
       });
     });
 
-    // Dialogue options
-    $$('.response-option[data-turn]').forEach(btn => {
+    // Stage check activity choices (Visual, Grammar, CoreSentence, Vocab, Phrases)
+    $$('[data-check]').forEach(btn => {
       btn.addEventListener('click', () => {
         if (st.isReadOnly) return;
-        const turn = parseInt(btn.dataset.turn);
-        const opt = parseInt(btn.dataset.opt);
-        const gd = LX.lesson_A1_001.guidedDialogue;
-        const dialogue = gd.dialogue;
-        const chosen = dialogue[turn].options[opt];
-        const correct = dialogue[turn].model;
-
-        if (!st.dialogueState.choices) st.dialogueState.choices = [];
-        st.dialogueState.choices[turn] = chosen;
-
-        const fbEl = document.getElementById(`dialogue-feedback-${turn}`);
-        const isCorrect = chosen === correct;
-        if (fbEl) {
-          fbEl.style.display = 'block';
-          fbEl.textContent = isCorrect ? '✅ Excellent! That\'s the model answer.' : `Good try! The model answer is: "${correct}"`;
-          fbEl.style.color = isCorrect ? 'var(--green)' : 'var(--amber)';
-          fbEl.style.fontWeight = '600';
+        const stageKey = btn.dataset.check;
+        const i = parseInt(btn.dataset.item);
+        const opt = btn.dataset.opt;
+        const cs = st.stageCheckState[stageKey];
+        if (!cs) return;
+        cs.answers[i] = opt;
+        // Highlight chosen
+        $$(`[data-check="${stageKey}"][data-item="${i}"]`).forEach(b => b.classList.remove('chosen'));
+        btn.classList.add('chosen');
+        // Mark in progress
+        const cur = LX.getStageStatus(stageKey);
+        if (cur === 'NOT_STARTED' || cur === 'VIEWED') {
+          LX.updateStageStatus(stageKey, { status: 'IN_PROGRESS' });
         }
-
-        setTimeout(() => {
-          st.dialogueState.currentTurn = turn + 2;
-          if (st.dialogueState.currentTurn >= dialogue.length) {
-            st.dialogueState.completed = true;
-            LX.saveStage05Attempt(st.dialogueState.choices, st.infoGapState.answers);
-          }
-          LX.performAutoSave();
-          render();
-        }, 1200);
+        LX.scheduleAutoSave();
       });
     });
 
+    // Begin lesson button (overview)
+    const beginBtn = document.getElementById('begin-lesson-btn');
+    if (beginBtn) {
+      beginBtn.addEventListener('click', () => {
+        LX.updateStageStatus('overview', { status: 'VIEWED' });
+        st.currentStage = Math.min(LX.STAGES.length - 1, st.currentStage + 1);
+        if (st.currentAttemptId) LX.performAutoSave();
+        render(); window.scrollTo(0, 0);
+      });
+    }
+
+    // Dialogue Part A choice buttons
+    $$('[data-dialogue-a]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (st.isReadOnly) return;
+        const i = parseInt(btn.dataset.dialogueA);
+        const opt = btn.dataset.opt;
+        st.dialogueState.partAChoices[i] = opt;
+        $$(`[data-dialogue-a="${i}"]`).forEach(b => b.classList.remove('chosen'));
+        btn.classList.add('chosen');
+        LX.scheduleAutoSave();
+      });
+    });
+
+    // Dialogue Part A check
+    const checkDialogueA = document.getElementById('check-dialogue-partA');
+    if (checkDialogueA) {
+      checkDialogueA.addEventListener('click', () => {
+        if (st.isReadOnly) return;
+        const partAItems = [
+          { answer: 'Is this your bag? It is black.' },
+          { answer: 'Are these your glasses? And are these your keys?' },
+          { answer: "They are not yours. They are the teacher's keys." },
+        ];
+        let correct = 0;
+        partAItems.forEach((q, i) => {
+          if (st.dialogueState.partAChoices[i] === q.answer) correct++;
+        });
+        st.dialogueState.partAChecked = true;
+        st.dialogueState.partAScore = correct;
+        st.dialogueState.partATotal = partAItems.length;
+        _updateDialogueStatus();
+        render();
+      });
+    }
+
+    // Dialogue Part B frames — track input
+    [0, 1, 2].forEach(i => {
+      const frame = document.getElementById(`frame-${i}`);
+      if (frame) {
+        frame.addEventListener('input', () => {
+          if (st.isReadOnly) return;
+          st.dialogueState.partBFrames[i] = frame.value;
+          LX.scheduleAutoSave();
+        });
+      }
+    });
+
+    // Dialogue Part B submit
+    const checkDialogueB = document.getElementById('check-dialogue-partB');
+    if (checkDialogueB) {
+      checkDialogueB.addEventListener('click', () => {
+        if (st.isReadOnly) return;
+        // Collect current frame values
+        [0, 1, 2].forEach(i => {
+          const f = document.getElementById(`frame-${i}`);
+          if (f) st.dialogueState.partBFrames[i] = f.value;
+        });
+        const frameCount = [0, 1, 2].filter(i => (st.dialogueState.partBFrames[i] || '').trim().length > 0).length;
+        st.dialogueState.partBChecked = true;
+        st.dialogueState.partBScore = frameCount;
+        st.dialogueState.partBTotal = 3;
+        _updateDialogueStatus();
+        render();
+      });
+    }
+
     const igBtn = document.getElementById('check-infogap-btn');
     if (igBtn) igBtn.addEventListener('click', checkInfoGap);
+
+    // InfoGap inputs: mark IN_PROGRESS on first input
+    $$('[id^="ig-"]').forEach(input => {
+      input.addEventListener('input', () => {
+        if (st.isReadOnly) return;
+        const i = parseInt(input.dataset.item);
+        st.infoGapState.answers[i] = input.value;
+        const cur = LX.getStageStatus('infogap');
+        if (cur === 'NOT_STARTED' || cur === 'VIEWED') {
+          LX.updateStageStatus('infogap', { status: 'IN_PROGRESS' });
+        }
+        LX.scheduleAutoSave();
+      });
+    });
 
     // Transfer scenario selector
     $$('.transfer-option-btn').forEach(btn => {
@@ -2253,6 +2647,10 @@
         if (st.isReadOnly) return;
         const idx = input.dataset.item;
         if (idx !== undefined) st.transferState.responses[idx] = input.value;
+        const cur = LX.getStageStatus('transfer');
+        if (cur === 'NOT_STARTED' || cur === 'VIEWED') {
+          LX.updateStageStatus('transfer', { status: 'IN_PROGRESS' });
+        }
         LX.scheduleAutoSave();
       });
     });
@@ -2262,6 +2660,10 @@
       transferDialogue.addEventListener('input', () => {
         if (st.isReadOnly) return;
         st.transferState.responses['dialogue'] = transferDialogue.value;
+        const cur = LX.getStageStatus('transfer');
+        if (cur === 'NOT_STARTED' || cur === 'VIEWED') {
+          LX.updateStageStatus('transfer', { status: 'IN_PROGRESS' });
+        }
         LX.scheduleAutoSave();
       });
     }
@@ -2276,6 +2678,22 @@
         st.transferState.submitted = true;
         st.transferState.score = score;
         st.transferState.feedback = band.desc;
+
+        // Freeze: Transfer responses are immutable once submitted
+        const hasResponses = Object.values(st.transferState.responses).some(v => v && v.trim().length > 5);
+        LX.updateStageStatus('transfer', {
+          status: hasResponses ? 'COMPLETED' : 'ATTEMPTED',
+          responseData: {
+            selectedScenario: st.transferState.selectedScenario,
+            responses: { ...st.transferState.responses }, // snapshot — immutable
+            submitted: true,
+            score,
+          },
+          score,
+          maxScore: 16,
+          feedback: band.desc,
+        });
+
         LX.saveStage06Attempt(scenario.id, st.transferState.responses, score, band.desc);
         LX.performAutoSave();
         render();
@@ -2307,14 +2725,35 @@
           }
           const dialogueData = sas['dialogue']?.response_data_json;
           if (dialogueData) {
-            st.dialogueState.currentTurn = dialogueData.currentTurn || 0;
-            st.dialogueState.choices = dialogueData.choices || [];
-            st.dialogueState.completed = dialogueData.completed || false;
+            // Support both old format (choices) and new format (partAChoices/partBFrames)
+            if (dialogueData.partAChoices !== undefined) {
+              st.dialogueState.partAChoices = dialogueData.partAChoices || {};
+              st.dialogueState.partAChecked = dialogueData.partAChecked || false;
+              st.dialogueState.partAScore = dialogueData.partAScore || 0;
+              st.dialogueState.partATotal = dialogueData.partATotal || 0;
+              st.dialogueState.partBFrames = dialogueData.partBFrames || {};
+              st.dialogueState.partBChecked = dialogueData.partBChecked || false;
+              st.dialogueState.partBScore = dialogueData.partBScore || 0;
+              st.dialogueState.partBTotal = dialogueData.partBTotal || 0;
+              st.dialogueState.completed = dialogueData.completed || false;
+            } else if (dialogueData.choices) {
+              // Legacy: migrate choices into partAChoices display
+              dialogueData.choices.forEach((c, i) => { st.dialogueState.partAChoices[i] = c; });
+              st.dialogueState.completed = dialogueData.completed || false;
+            }
           }
+          // Restore stage check states
+          ['visual', 'grammar', 'coresentence', 'vocabulary', 'phrases'].forEach(key => {
+            if (sas[key]?.response_data_json) {
+              st.stageCheckState[key] = sas[key].response_data_json;
+            }
+          });
           const infoGapData = sas['infogap']?.response_data_json;
           if (infoGapData) {
             st.infoGapState.answers = infoGapData.answers || {};
             st.infoGapState.completed = infoGapData.completed || false;
+            st.infoGapState.score = infoGapData.score || 0;
+            st.infoGapState.total = infoGapData.total || 0;
           }
           const transferData = sas['transfer']?.response_data_json;
           if (transferData) {
@@ -2323,8 +2762,8 @@
             st.transferState.submitted = transferData.submitted || false;
           }
           const feedbackData = sas['feedback']?.response_data_json;
-          if (feedbackData?.rubricScores) st.rubricScores = feedbackData.rubricScores;
-          else if (attempt.attempt_summary_json?.rubricScores) st.rubricScores = attempt.attempt_summary_json.rubricScores;
+          if (feedbackData?.rubricScores) { st.rubricScores = feedbackData.rubricScores; st.rubricEvidence = feedbackData.rubricEvidence || {}; }
+          else if (attempt.attempt_summary_json?.rubricScores) { st.rubricScores = attempt.attempt_summary_json.rubricScores; st.rubricEvidence = attempt.attempt_summary_json.rubricEvidence || {}; }
         }
         navigate(`/attempts/${aid}`);
       });
@@ -2349,11 +2788,31 @@
             if (practiceData.questionTransform) st.exerciseState.questionTransform = practiceData.questionTransform;
           }
           const dialogueData = sas['dialogue']?.response_data_json;
-          if (dialogueData) { st.dialogueState.currentTurn = dialogueData.currentTurn || 0; st.dialogueState.choices = dialogueData.choices || []; st.dialogueState.completed = dialogueData.completed || false; }
+          if (dialogueData) {
+            if (dialogueData.partAChoices !== undefined) {
+              st.dialogueState.partAChoices = dialogueData.partAChoices || {};
+              st.dialogueState.partAChecked = dialogueData.partAChecked || false;
+              st.dialogueState.partAScore = dialogueData.partAScore || 0;
+              st.dialogueState.partATotal = dialogueData.partATotal || 0;
+              st.dialogueState.partBFrames = dialogueData.partBFrames || {};
+              st.dialogueState.partBChecked = dialogueData.partBChecked || false;
+              st.dialogueState.partBScore = dialogueData.partBScore || 0;
+              st.dialogueState.partBTotal = dialogueData.partBTotal || 0;
+              st.dialogueState.completed = dialogueData.completed || false;
+            }
+          }
+          ['visual', 'grammar', 'coresentence', 'vocabulary', 'phrases'].forEach(key => {
+            if (sas[key]?.response_data_json) st.stageCheckState[key] = sas[key].response_data_json;
+          });
           const infoGapData = sas['infogap']?.response_data_json;
-          if (infoGapData) { st.infoGapState.answers = infoGapData.answers || {}; st.infoGapState.completed = infoGapData.completed || false; }
+          if (infoGapData) { st.infoGapState.answers = infoGapData.answers || {}; st.infoGapState.completed = infoGapData.completed || false; st.infoGapState.score = infoGapData.score || 0; st.infoGapState.total = infoGapData.total || 0; }
           const transferData = sas['transfer']?.response_data_json;
           if (transferData) { st.transferState.selectedScenario = transferData.selectedScenario || 0; st.transferState.responses = transferData.responses || {}; st.transferState.submitted = transferData.submitted || false; }
+          // Restore stage statuses
+          st.stageStatuses = {};
+          Object.entries(sas).forEach(([key, sa]) => {
+            if (sa && sa.status) st.stageStatuses[key] = sa.status;
+          });
           LX.startActiveTimer();
           LX.scheduleAutoSave();
           st.currentView = 'lesson';
@@ -2448,17 +2907,30 @@
 
   function _resetRuntimeState() {
     st.currentStage = 0;
+    st.stageStatuses = {};
     st.stagesCompleted = new Set();
+    st.stageCheckState = {
+      visual:       { answers: {}, submitted: false, score: 0, total: 0 },
+      grammar:      { answers: {}, submitted: false, score: 0, total: 0 },
+      coresentence: { answers: {}, submitted: false, score: 0, total: 0 },
+      vocabulary:   { answers: {}, submitted: false, score: 0, total: 0 },
+      phrases:      { answers: {}, submitted: false, score: 0, total: 0 },
+    };
     st.exerciseState = {
       recognition:          { answers: {}, checked: false, score: 0, total: 0 },
       matching:             { answers: {}, checked: false, score: 0, total: 0 },
       controlledProduction: { answers: {}, checked: false, score: 0, total: 0 },
       questionTransform:    { answers: {}, checked: false, score: 0, total: 0 },
     };
-    st.dialogueState = { currentTurn: 0, choices: [], completed: false };
-    st.infoGapState = { answers: {}, completed: false };
+    st.dialogueState = {
+      partAChoices: {}, partAChecked: false, partAScore: 0, partATotal: 0,
+      partBFrames: {}, partBChecked: false, partBScore: 0, partBTotal: 0,
+      completed: false,
+    };
+    st.infoGapState = { answers: {}, completed: false, score: 0, total: 0 };
     st.transferState = { selectedScenario: 0, responses: {}, submitted: false, score: null, feedback: null };
     st.rubricScores = {};
+    st.rubricEvidence = {};
     st.attemptRecords = { stage05_attempt: null, stage06_attempts: [] };
     st._activeDurationSeconds = 0;
     st._activeTimerStart = null;
@@ -2496,6 +2968,59 @@
     st.currentView = 'dashboard';
     location.hash = '';
     render();
+  }
+
+  // ── STAGE CHECK ACTIVITY (Visual, Grammar, CoreSentence, Vocab, Phrases) ──
+  function checkStageActivity(stageKey) {
+    if (st.isReadOnly) return;
+    const cs = st.stageCheckState[stageKey];
+    if (!cs || cs.submitted) return;
+
+    // Determine correct answers from stage-specific question set
+    const qItems = _getStageCheckQuestions(stageKey);
+    if (!qItems) return;
+
+    let correct = 0;
+    qItems.forEach((q, i) => {
+      if (cs.answers[i] === q.answer) correct++;
+    });
+
+    cs.score = correct;
+    cs.total = qItems.length;
+    cs.submitted = true;
+
+    const pct = correct / qItems.length;
+    const newStatus = pct >= 0.67 ? 'COMPLETED' : 'NEEDS_REVIEW';
+    LX.updateStageStatus(stageKey, {
+      status: newStatus,
+      responseData: { ...cs },
+      score: correct,
+      maxScore: qItems.length,
+    });
+
+    render();
+  }
+
+  function _getStageCheckQuestions(stageKey) {
+    const maps = {
+      visual: [
+        { answer: 'is' }, { answer: 'are' }, { answer: 'is' }, { answer: 'are' }
+      ],
+      grammar: [
+        { answer: 'is' }, { answer: 'Are' }, { answer: 'are' }
+      ],
+      coresentence: [
+        { answer: 'is' }, { answer: 'keys' }, { answer: "Sarah's" }
+      ],
+      vocabulary: [
+        { answer: 'a place for forgotten items' }, { answer: 'to be owned by someone' },
+        { answer: 'to say what something looks like' }, { answer: 'to say something is yours' }
+      ],
+      phrases: [
+        { answer: 'Is this your bag?' }, { answer: 'The keys are not mine.' }, { answer: "It is Sarah's umbrella." }
+      ],
+    };
+    return maps[stageKey] || null;
   }
 
   // ── EXERCISE CHECKING ──
@@ -2560,7 +3085,82 @@
     const checkBtn = document.getElementById(`check-${stageId}`);
     if (checkBtn) { checkBtn.textContent = 'Checked ✓'; checkBtn.disabled = true; }
 
+    // Update practice stage status based on how many sub-exercises are checked
+    _updatePracticeStageStatus();
+
     LX.performAutoSave();
+  }
+
+  function _updateDialogueStatus() {
+    const ds = st.dialogueState;
+    const bothDone = ds.partAChecked && ds.partBChecked;
+    const eitherDone = ds.partAChecked || ds.partBChecked;
+
+    const totalScore = (ds.partAScore || 0) + (ds.partBScore || 0);
+    const totalMax = (ds.partATotal || 3) + (ds.partBTotal || 3);
+    const pct = totalMax > 0 ? totalScore / totalMax : 0;
+
+    let newStatus;
+    if (bothDone) {
+      ds.completed = true;
+      newStatus = pct >= 0.67 ? 'COMPLETED' : 'NEEDS_REVIEW';
+    } else if (eitherDone) {
+      newStatus = 'ATTEMPTED';
+    } else {
+      newStatus = 'IN_PROGRESS';
+    }
+
+    LX.updateStageStatus('dialogue', {
+      status: newStatus,
+      responseData: {
+        partAChoices: ds.partAChoices,
+        partAChecked: ds.partAChecked,
+        partAScore: ds.partAScore,
+        partATotal: ds.partATotal,
+        partBFrames: ds.partBFrames,
+        partBChecked: ds.partBChecked,
+        partBScore: ds.partBScore,
+        partBTotal: ds.partBTotal,
+        completed: ds.completed,
+      },
+      score: totalScore,
+      maxScore: totalMax,
+    });
+  }
+
+  function _updatePracticeStageStatus() {
+    const es = st.exerciseState;
+    const allSubs = ['recognition', 'matching', 'controlledProduction', 'questionTransform'];
+    const checkedCount = allSubs.filter(k => es[k]?.checked).length;
+    if (checkedCount === 0) return;
+
+    const totalScore = allSubs.reduce((s, k) => s + (es[k]?.score || 0), 0);
+    const totalMax = allSubs.reduce((s, k) => s + (es[k]?.total || 0), 0);
+    const allChecked = checkedCount === allSubs.length;
+    const pct = totalMax > 0 ? totalScore / totalMax : 0;
+
+    let newStatus;
+    if (allChecked) {
+      newStatus = pct >= 0.67 ? 'COMPLETED' : 'NEEDS_REVIEW';
+    } else {
+      newStatus = 'ATTEMPTED';
+    }
+
+    const cur = LX.getStageStatus('practice');
+    // Don't downgrade COMPLETED to ATTEMPTED
+    if (cur === 'COMPLETED' && newStatus === 'ATTEMPTED') return;
+
+    LX.updateStageStatus('practice', {
+      status: newStatus,
+      responseData: {
+        recognition: es.recognition,
+        matching: es.matching,
+        controlledProduction: es.controlledProduction,
+        questionTransform: es.questionTransform,
+      },
+      score: totalScore,
+      maxScore: totalMax,
+    });
   }
 
   function checkInfoGap() {
@@ -2572,8 +3172,23 @@
       answers[i] = input.value;
     });
     st.infoGapState.answers = answers;
+
+    // Score: how many inputs have content
+    const filled = Object.values(answers).filter(v => v && v.trim().length > 0).length;
+    const total = ig.studentHas ? ig.studentHas.length : 4;
+    const pct = total > 0 ? filled / total : 0;
+
     st.infoGapState.completed = true;
-    LX.saveStage05Attempt(st.dialogueState.choices || [], answers);
+    st.infoGapState.score = filled;
+    st.infoGapState.total = total;
+
+    LX.updateStageStatus('infogap', {
+      status: pct >= 0.67 ? 'COMPLETED' : 'NEEDS_REVIEW',
+      responseData: { answers, completed: true, score: filled, total },
+      score: filled,
+      maxScore: total,
+    });
+
     LX.performAutoSave();
     render();
   }
@@ -2581,6 +3196,11 @@
   // ── INIT ──
   function init() {
     st.currentView = getRoute();
+    // Wire _renderLesson so state.js._navigateToStage can trigger a re-render
+    LX._renderLesson = function() {
+      st.currentView = 'lesson';
+      render();
+    };
     render();
   }
 
