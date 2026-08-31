@@ -832,6 +832,116 @@ table.grammar-table {
   .rubric-score-num { font-size: 40px; }
 }
 
+/* ══════════════════════════════════════════════
+   PHASE 1.5 — SAVE BAR / READ-ONLY BANNER
+   ══════════════════════════════════════════════ */
+.lx-save-bar {
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 24px;
+  margin-bottom: 12px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  box-shadow: var(--shadow-sm);
+}
+.lx-save-bar-inner {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.lx-attempt-badge {
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 12px; font-weight: 700;
+  background: var(--accent-light); color: var(--accent);
+}
+.lx-save-indicator {
+  font-size: 12px; font-weight: 600; padding: 3px 10px;
+  border-radius: 20px; transition: all 0.2s;
+}
+.lx-save-indicator.saving {
+  background: var(--amber-light); color: var(--amber);
+}
+.lx-save-indicator.saved {
+  background: var(--green-light); color: var(--green);
+}
+.lx-save-exit-btn {
+  margin-left: auto;
+  padding: 5px 14px; border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border); background: transparent;
+  font-size: 13px; font-weight: 600; color: var(--grey); cursor: pointer;
+  transition: all 0.15s;
+}
+.lx-save-exit-btn:hover { color: var(--navy); background: var(--grey-bg); border-color: var(--border-dark); }
+
+.lx-readonly-banner {
+  background: #FFF8F0;
+  border-bottom: 1px solid var(--amber);
+  padding: 8px 24px;
+  margin-bottom: 12px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+.lx-readonly-badge {
+  font-size: 12px; font-weight: 700;
+  color: var(--amber);
+  padding: 3px 10px; background: var(--amber-light); border-radius: 20px;
+}
+
+/* ══════════════════════════════════════════════
+   PHASE 1.5 — LESSON CARD: IN-PROGRESS / COMPLETED
+   ══════════════════════════════════════════════ */
+.btn-continue {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 20px; border-radius: var(--radius-sm);
+  border: none; background: var(--accent); color: white;
+  font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.15s;
+}
+.btn-continue:hover { background: #4A4FE0; transform: translateY(-1px); }
+.btn-outline-sm {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border); background: transparent;
+  font-size: 13px; font-weight: 600; color: var(--grey); cursor: pointer; transition: all 0.15s;
+}
+.btn-outline-sm:hover { color: var(--navy); border-color: var(--border-dark); background: var(--grey-bg); }
+.status-pill-inprogress { background: var(--accent-light); color: var(--accent); }
+.status-pill-completed { background: var(--green-light); color: var(--green); }
+.status-pill-notstarted { background: var(--grey-bg); color: var(--grey); }
+.status-pill-locked { background: var(--grey-bg); color: var(--grey-light); }
+
+/* ══════════════════════════════════════════════
+   PHASE 1.5 — MODAL (New Attempt Confirm)
+   ══════════════════════════════════════════════ */
+.lx-modal-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(11,19,37,0.55);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  animation: fadeIn 0.15s ease;
+}
+.lx-modal {
+  background: var(--white);
+  border-radius: var(--radius-md);
+  padding: 28px 32px;
+  max-width: 440px; width: 100%;
+  box-shadow: var(--shadow-lg);
+  animation: slideUp 0.2s ease;
+}
+@keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* ══════════════════════════════════════════════
+   PHASE 1.5 — ATTEMPTS TABLE OVERRIDES
+   ══════════════════════════════════════════════ */
+.grammar-table td { vertical-align: middle; }
+.grammar-table th { white-space: nowrap; }
+
+/* ══════════════════════════════════════════════
+   PHASE 1.5 — COMPARE SELECTS
+   ══════════════════════════════════════════════ */
+.compare-select {
+  padding: 8px 12px; border: 1.5px solid var(--border);
+  border-radius: 8px; font-family: var(--font); font-size: 13px;
+  color: var(--navy); background: white; outline: none; cursor: pointer;
+}
+.compare-select:focus { border-color: var(--accent); }
+
+
 /* ── TRANSITIONS ── */
 .fade-in {
   animation: fadeIn 0.3s ease forwards;
