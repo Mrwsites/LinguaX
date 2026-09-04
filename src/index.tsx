@@ -56,6 +56,7 @@ function appHTML(): string {
 <body>
   <div id="app-root"></div>
   <script src="/static/js/data.js"></script>
+  <script src="/static/js/curriculum_data.js"></script>
   <script src="/static/js/persist.js"></script>
   <script src="/static/js/state.js"></script>
   <script src="/static/js/app.js"></script>
