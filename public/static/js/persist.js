@@ -761,6 +761,59 @@
       .sort((a, b) => new Date(a.scheduled_for) - new Date(b.scheduled_for));
   }
 
+  /**
+   * Mark a single review event as COMPLETED.
+   * @param {string} eventId — the review event id (e.g. "rev-attempt-...-end_of_lesson")
+   * @returns {object|null} the updated event, or null if not found
+   */
+  function markReviewComplete(eventId) {
+    const store = getStore();
+    const now = new Date().toISOString();
+    for (const attemptId of Object.keys(store.review_events)) {
+      const events = store.review_events[attemptId];
+      const ev = events.find(e => e.id === eventId);
+      if (ev) {
+        ev.status = 'COMPLETED';
+        ev.completed_at = now;
+        ev.updated_at = now;
+        saveStore(store);
+        return ev;
+      }
+    }
+    console.warn('[LX persist] markReviewComplete: event not found', eventId);
+    return null;
+  }
+
+  /**
+   * Returns true if the lesson has at least one COMPLETED attempt AND
+   * there is at least one review event with scheduled_for <= now and status !== COMPLETED.
+   */
+  function isLessonReviewDue(lessonId) {
+    const store = getStore();
+    const now = new Date();
+    // Any completed attempt for this lesson?
+    const hasCompleted = Object.values(store.lesson_attempts).some(
+      a => a.lesson_id === (lessonId || LESSON_ID) && a.status === 'COMPLETED'
+    );
+    if (!hasCompleted) return false;
+    // Any overdue review event?
+    const allEvents = Object.values(store.review_events).flat();
+    return allEvents.some(ev => ev.status !== 'COMPLETED' && new Date(ev.scheduled_for) <= now);
+  }
+
+  /**
+   * Get the next pending review event for the lesson (the earliest due one).
+   */
+  function getNextReviewEvent(lessonId) {
+    const store = getStore();
+    const now = new Date();
+    const allEvents = Object.values(store.review_events)
+      .flat()
+      .filter(ev => ev.status !== 'COMPLETED')
+      .sort((a, b) => new Date(a.scheduled_for) - new Date(b.scheduled_for));
+    return allEvents[0] || null;
+  }
+
   /** Get the current assignment. */
   function getAssignment() {
     const store = getStore();
@@ -857,6 +910,7 @@
     completeAttempt,
     logStageChange,
     logScenarioSelected,
+    markReviewComplete,
     // Read
     getAllAttempts,
     getAttempt,
@@ -869,6 +923,8 @@
     getLatestCompletedAttempt,
     getScenarioData,
     getAttemptEvents,
+    isLessonReviewDue,
+    getNextReviewEvent,
     // Utils
     formatDuration,
     formatDateTime,

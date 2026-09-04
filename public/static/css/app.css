@@ -1439,3 +1439,269 @@ table.grammar-table {
   .lx-lp-lesson-row { padding: 10px 14px; }
 }
 
+/* ══════════════════════════════════════════════
+   MODULE D — LESSON REVIEW PAGE (EXTENDED)
+   ══════════════════════════════════════════════ */
+
+/* Enhanced review page: restrict width */
+.lx-review-page { max-width: 760px; }
+
+/* Review summary stats grid */
+.lx-review-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px; margin-bottom: 16px;
+}
+
+/* 8-dimension rubric inside review summary */
+.lx-review-rubric {
+  border-top: 1px solid var(--border);
+  padding-top: 14px; margin-top: 4px;
+}
+.lx-review-rubric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 6px;
+}
+.lx-review-rubric-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 8px; border-radius: 6px;
+  background: var(--grey-bg);
+}
+.lx-review-rubric-label { flex: 1; font-size: 12px; color: var(--navy); font-weight: 600; }
+.lx-review-rubric-dots { display: flex; gap: 4px; }
+.lx-review-rubric-score { font-size: 11px; color: var(--grey); font-weight: 700; min-width: 22px; text-align: right; }
+
+/* Rubric dot shared */
+.lx-rdot {
+  width: 11px; height: 11px; border-radius: 50%;
+  background: var(--border); display: inline-block;
+}
+.lx-rdot.lx-rdot-filled { background: var(--accent); }
+
+/* Restart action card variant */
+.lx-review-action-card--restart {
+  border-color: var(--amber); background: var(--amber-light);
+}
+.lx-review-action-card--restart .lx-review-action-title { color: var(--amber); }
+
+/* btn-outline for review action card */
+.btn-outline {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 20px; border-radius: var(--radius-md);
+  border: 2px solid var(--amber); background: transparent;
+  color: var(--amber); font-size: 13px; font-weight: 600;
+  cursor: pointer; font-family: var(--font);
+  transition: all 0.15s;
+}
+.btn-outline:hover { background: var(--amber); color: var(--white); }
+.btn-outline:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+/* Spaced-review plan on review page */
+.lx-review-plan {
+  background: var(--white); border-radius: var(--radius-lg);
+  border: 1px solid var(--border); padding: 20px 24px;
+  box-shadow: var(--shadow-sm); margin-top: 20px;
+}
+.lx-review-plan-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.lx-review-plan-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; border-radius: var(--radius-md);
+  background: var(--grey-bg); border: 1px solid var(--border);
+  transition: background 0.15s;
+}
+.lx-review-plan-row.lx-rp-done {
+  background: #F0FDF4; border-color: var(--green); opacity: 0.8;
+}
+.lx-review-plan-row.lx-rp-due {
+  background: var(--amber-light); border-color: var(--amber);
+}
+.lx-review-plan-row.lx-rp-upcoming { background: var(--grey-bg); }
+
+.lx-rp-icon { font-size: 20px; flex-shrink: 0; }
+.lx-rp-info { flex: 1; }
+.lx-rp-label { font-size: 13px; font-weight: 600; color: var(--navy); }
+.lx-rp-status { font-size: 12px; color: var(--grey); margin-top: 2px; }
+
+/* ══════════════════════════════════════════════
+   MODULE D — RESTART CONFIRM MODAL
+   ══════════════════════════════════════════════ */
+.lx-restart-modal-body {
+  text-align: center;
+  max-width: 440px;
+}
+.lx-restart-modal-icon { font-size: 40px; margin-bottom: 8px; }
+.lx-restart-modal-title {
+  font-size: 20px; font-weight: 800; color: var(--navy);
+  margin: 0 0 12px;
+}
+.lx-restart-modal-desc {
+  font-size: 14px; color: var(--grey); line-height: 1.6;
+  margin-bottom: 24px;
+}
+.lx-restart-modal-actions {
+  display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+}
+
+/* ══════════════════════════════════════════════
+   MODULE D — ATTEMPT HISTORY PAGE (#/attempts/:lessonId)
+   ══════════════════════════════════════════════ */
+.lx-attempt-history-page { max-width: 760px; margin: 0 auto; padding: 0 0 40px; }
+
+.lx-ah-header {
+  background: var(--white); border-radius: var(--radius-lg);
+  border: 1px solid var(--border); padding: 22px 28px;
+  margin-bottom: 18px; box-shadow: var(--shadow-sm);
+}
+.lx-ah-breadcrumb { margin-bottom: 10px; }
+.lx-ah-title { font-size: 20px; font-weight: 800; color: var(--navy); margin: 8px 0 0; }
+.lx-ah-subtitle { font-size: 13px; color: var(--grey); margin: 4px 0 0; }
+
+.lx-ah-action-bar {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+/* Attempt list */
+.lx-ah-list { display: flex; flex-direction: column; gap: 14px; }
+
+.lx-ah-card {
+  background: var(--white); border-radius: var(--radius-lg);
+  border: 1px solid var(--border); padding: 18px 22px;
+  box-shadow: var(--shadow-sm); transition: box-shadow 0.15s;
+}
+.lx-ah-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lx-ah-card:hover { box-shadow: var(--shadow-md); }
+.lx-ah-card-inprogress { border-color: var(--accent); background: var(--accent-light); }
+
+.lx-ah-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 8px; margin-bottom: 12px;
+}
+.lx-ah-card-num { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lx-ah-card-actions { display: flex; gap: 8px; }
+
+.lx-ah-attempt-badge {
+  display: inline-block; font-size: 13px; font-weight: 700;
+  color: var(--navy); background: var(--grey-bg);
+  padding: 3px 10px; border-radius: 20px;
+}
+
+.lx-ah-card-meta {
+  display: flex; flex-wrap: wrap; gap: 10px;
+}
+.lx-ah-meta-item {
+  display: flex; flex-direction: column; gap: 2px;
+  background: var(--grey-bg); border-radius: 6px;
+  padding: 6px 10px; min-width: 110px;
+}
+.lx-ah-meta-label {
+  font-size: 10px; font-weight: 700; color: var(--grey);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.lx-ah-meta-val { font-size: 12px; color: var(--navy); font-weight: 600; }
+
+/* ══════════════════════════════════════════════
+   MODULE D — ATTEMPT DETAIL FROM HISTORY
+   (#/attempts/:lessonId/:attemptId)
+   ══════════════════════════════════════════════ */
+.lx-attempt-detail-page { max-width: 760px; margin: 0 auto; padding: 0 0 40px; }
+
+.lx-ah-detail-meta-card {
+  background: var(--white); border-radius: var(--radius-lg);
+  border: 1px solid var(--border); padding: 20px 24px;
+  box-shadow: var(--shadow-sm); margin-bottom: 18px;
+}
+.lx-ah-detail-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+}
+.lx-ah-dm-cell {
+  background: var(--grey-bg); border-radius: 8px; padding: 10px 12px;
+}
+.lx-ah-dm-label {
+  font-size: 10px; font-weight: 700; color: var(--grey);
+  text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px;
+}
+.lx-ah-dm-val { font-size: 14px; font-weight: 600; color: var(--navy); }
+.lx-big-score { font-size: 20px !important; font-weight: 800 !important; color: var(--green) !important; }
+
+/* Sections */
+.lx-ah-detail-section {
+  background: var(--white); border-radius: var(--radius-lg);
+  border: 1px solid var(--border); padding: 18px 22px;
+  box-shadow: var(--shadow-sm); margin-bottom: 16px;
+}
+.lx-ah-detail-section-title {
+  font-size: 14px; font-weight: 700; color: var(--navy);
+  margin-bottom: 14px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Rubric grid inside detail */
+.lx-ah-rubric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 6px;
+}
+.lx-ah-rubric-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; border-radius: 6px; background: var(--grey-bg);
+}
+.lx-ah-rubric-label { flex: 1; font-size: 12px; color: var(--navy); font-weight: 600; }
+.lx-ah-rubric-dots { display: flex; gap: 4px; }
+.lx-ah-rubric-score { font-size: 11px; color: var(--grey); font-weight: 700; min-width: 22px; text-align: right; }
+
+/* Stage rows inside detail */
+.lx-ah-stage-row {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+}
+.lx-ah-stage-row:last-child { border-bottom: none; }
+.lx-ah-stage-icon { font-size: 18px; flex-shrink: 0; margin-top: 2px; }
+.lx-ah-stage-info { flex: 1; min-width: 0; }
+.lx-ah-stage-name { font-size: 13px; font-weight: 700; color: var(--navy); }
+.lx-ah-stage-responses { font-size: 12px; color: var(--grey); margin-top: 3px; line-height: 1.4; }
+.lx-ah-stage-right {
+  display: flex; flex-direction: column; align-items: flex-end;
+  gap: 4px; flex-shrink: 0;
+}
+.lx-ah-stage-score { font-size: 12px; font-weight: 700; color: var(--navy); }
+
+/* Stage status badges */
+.lx-ah-stage-status-badge {
+  display: inline-block; font-size: 11px; padding: 2px 8px;
+  border-radius: 20px; font-weight: 600;
+}
+.lx-sb-completed  { background: #D1FAE5; color: #065F46; }
+.lx-sb-review     { background: #FEF3C7; color: #92400E; }
+.lx-sb-attempted  { background: #E0E7FF; color: #3730A3; }
+.lx-sb-inprogress { background: var(--accent-light); color: var(--accent); }
+.lx-sb-viewed     { background: var(--grey-bg); color: var(--grey); }
+.lx-sb-default    { background: var(--grey-bg); color: var(--grey-light); }
+
+/* Compact review plan row inside detail */
+.lx-rp-row-compact {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap;
+}
+.lx-rp-row-compact:last-child { border-bottom: none; }
+.lx-rp-date { font-size: 12px; color: var(--grey); margin-left: auto; }
+.lx-rp-status-badge {
+  font-size: 11px; font-weight: 600; padding: 2px 8px;
+  border-radius: 20px;
+}
+.lx-rp-done     { background: #D1FAE5; color: #065F46; }
+.lx-rp-due      { background: #FEF3C7; color: #92400E; }
+.lx-rp-upcoming { background: var(--grey-bg); color: var(--grey); }
+
+/* ── Responsive for Module D pages ── */
+@media (max-width: 640px) {
+  .lx-ah-detail-meta-grid { grid-template-columns: 1fr 1fr; }
+  .lx-ah-rubric-grid { grid-template-columns: 1fr; }
+  .lx-review-rubric-grid { grid-template-columns: 1fr; }
+  .lx-review-stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .lx-ah-card { padding: 14px 16px; }
+}
+

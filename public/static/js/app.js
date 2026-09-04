@@ -22,77 +22,88 @@
   function $(sel, root) { return (root || document).querySelector(sel); }
 
   // ── ROUTER ──
+  // Route patterns (Module D extended):
+  //   #/lesson/:id/review        → lesson_review
+  //   #/attempts/:lessonId/:attemptId  → attempt_detail_from_history  (new Module D)
+  //   #/attempts/:lessonId       → attempt_history                    (new Module D)
+  //   #/attempts/compare         → attempt_compare (legacy)
+  //   #/attempts/<attemptId>     → attempt_detail  (legacy from old /attempts page)
+  //   #/attempts                 → attempts (legacy global list)
+  function _parseRoute(hash) {
+    const r = hash.replace('#', '') || '';
+
+    if (r.startsWith('/lesson/') && r.includes('/review')) {
+      return { view: 'lesson_review', lessonId: r.replace('/lesson/', '').replace('/review', '') };
+    }
+    if (r.startsWith('/lesson')) return { view: 'lesson' };
+    if (r.startsWith('/teacher')) return { view: 'teacher' };
+    if (r.startsWith('/admin')) return { view: 'admin' };
+    if (r.startsWith('/path/')) return { view: 'level_path', level: r.replace('/path/', '') };
+    if (r.startsWith('/path')) return { view: 'path' };
+    if (r.startsWith('/scenario/')) return { view: 'scenario', family: r.replace('/scenario/', '') };
+
+    // attempts sub-routes — order matters: compare first, then lesson-specific history
+    if (r.startsWith('/attempts/compare')) return { view: 'attempt_compare' };
+
+    // /attempts/:lessonId/:attemptId — two slash-separated segments after /attempts/
+    const attParts = r.replace('/attempts/', '').split('/');
+    if (r.startsWith('/attempts/') && attParts.length >= 2) {
+      // attParts[0] is the lessonId, attParts[1] is the attemptId
+      const lessonId = attParts[0];
+      const attemptId = attParts.slice(1).join('/');
+      // Distinguish lesson-id-style (contains '-') from old uuid-style attempt ids
+      // A lessonId looks like "A1-BE-LOST-PROPERTY-001", attempt ids start with "attempt-"
+      if (lessonId.startsWith('attempt-')) {
+        // Legacy: /attempts/<attemptId>
+        return { view: 'attempt_detail', attemptId: lessonId };
+      }
+      return { view: 'attempt_detail_from_history', lessonId, attemptId };
+    }
+    if (r.startsWith('/attempts/')) {
+      // /attempts/<something> — single segment
+      const seg = r.replace('/attempts/', '');
+      if (seg.startsWith('attempt-')) {
+        // Legacy attempt detail
+        return { view: 'attempt_detail', attemptId: seg };
+      }
+      // Treat as lesson-id history page
+      return { view: 'attempt_history', lessonId: seg };
+    }
+    if (r.startsWith('/attempts')) return { view: 'attempts' };
+
+    return { view: 'dashboard' };
+  }
+
   function getRoute() {
-    const hash = location.hash.replace('#', '') || '';
-    if (hash.startsWith('/lesson/') && hash.includes('/review')) return 'lesson_review';
-    if (hash.startsWith('/lesson')) return 'lesson';
-    if (hash.startsWith('/teacher')) return 'teacher';
-    if (hash.startsWith('/admin')) return 'admin';
-    if (hash.startsWith('/attempts/compare')) return 'attempt_compare';
-    if (hash.startsWith('/attempts/')) return 'attempt_detail';
-    if (hash.startsWith('/attempts')) return 'attempts';
-    if (hash.startsWith('/path/')) return 'level_path';
-    if (hash.startsWith('/path')) return 'path';
-    if (hash.startsWith('/scenario/')) return 'scenario';
-    return 'dashboard';
+    return _parseRoute(location.hash).view;
+  }
+
+  function _applyRoute(parsed) {
+    st.currentView = parsed.view;
+    if (parsed.lessonId !== undefined) {
+      st.reviewLessonId = parsed.lessonId;
+      st.historyLessonId = parsed.lessonId;
+    }
+    if (parsed.level !== undefined) st.pathLevel = parsed.level;
+    if (parsed.family !== undefined) st.scenarioFamily = parsed.family;
+    if (parsed.attemptId !== undefined) {
+      st.readOnlyAttemptId = parsed.attemptId;
+      if (parsed.view === 'attempt_detail_from_history') {
+        st.selectedAttemptId = parsed.attemptId;
+      }
+    }
   }
 
   function navigate(route) {
     location.hash = route;
-    const r = route.replace('#', '');
-    if (r.startsWith('/lesson/') && r.includes('/review')) {
-      st.reviewLessonId = r.replace('/lesson/', '').replace('/review', '');
-      st.currentView = 'lesson_review';
-    } else if (r.startsWith('/lesson')) {
-      st.currentView = 'lesson';
-    } else if (r.startsWith('/teacher')) {
-      st.currentView = 'teacher';
-    } else if (r.startsWith('/admin')) {
-      st.currentView = 'admin';
-    } else if (r.startsWith('/attempts/compare')) {
-      st.currentView = 'attempt_compare';
-    } else if (r.startsWith('/attempts/')) {
-      st.readOnlyAttemptId = r.replace('/attempts/', '');
-      st.currentView = 'attempt_detail';
-    } else if (r.startsWith('/attempts')) {
-      st.currentView = 'attempts';
-    } else if (r.startsWith('/path/')) {
-      st.pathLevel = r.replace('/path/', '');
-      st.currentView = 'level_path';
-    } else if (r.startsWith('/path')) {
-      st.currentView = 'path';
-    } else if (r.startsWith('/scenario/')) {
-      st.scenarioFamily = r.replace('/scenario/', '');
-      st.currentView = 'scenario';
-    } else {
-      st.currentView = 'dashboard';
-    }
+    const parsed = _parseRoute(route);
+    _applyRoute(parsed);
     render();
   }
 
   window.addEventListener('hashchange', () => {
-    const route = location.hash.replace('#', '') || '';
-    if (route.startsWith('/lesson/') && route.includes('/review')) {
-      st.reviewLessonId = route.replace('/lesson/', '').replace('/review', '');
-      st.currentView = 'lesson_review';
-    } else if (route.startsWith('/attempts/compare')) {
-      st.currentView = 'attempt_compare';
-    } else if (route.startsWith('/attempts/')) {
-      st.readOnlyAttemptId = route.replace('/attempts/', '');
-      st.currentView = 'attempt_detail';
-    } else if (route.startsWith('/attempts')) {
-      st.currentView = 'attempts';
-    } else if (route.startsWith('/path/')) {
-      st.pathLevel = route.replace('/path/', '');
-      st.currentView = 'level_path';
-    } else if (route.startsWith('/path')) {
-      st.currentView = 'path';
-    } else if (route.startsWith('/scenario/')) {
-      st.scenarioFamily = route.replace('/scenario/', '');
-      st.currentView = 'scenario';
-    } else {
-      st.currentView = getRoute();
-    }
+    const parsed = _parseRoute(location.hash);
+    _applyRoute(parsed);
     render();
   });
 
@@ -108,16 +119,18 @@
 
     content.appendChild(renderRoleSwitcher());
 
-    if (st.currentView === 'lesson')           content.appendChild(renderLessonView());
-    else if (st.currentView === 'lesson_review') content.appendChild(renderLessonReviewView());
-    else if (st.currentView === 'teacher')     content.appendChild(renderTeacherView());
-    else if (st.currentView === 'admin')       content.appendChild(renderAdminView());
-    else if (st.currentView === 'attempts')    content.appendChild(renderAttemptsPage());
-    else if (st.currentView === 'attempt_detail')  content.appendChild(renderAttemptDetailPage());
-    else if (st.currentView === 'attempt_compare') content.appendChild(renderAttemptComparePage());
-    else if (st.currentView === 'path')        content.appendChild(renderPathView());
-    else if (st.currentView === 'level_path')  content.appendChild(renderLevelPathView());
-    else if (st.currentView === 'scenario')    content.appendChild(renderScenarioView());
+    if (st.currentView === 'lesson')                    content.appendChild(renderLessonView());
+    else if (st.currentView === 'lesson_review')        content.appendChild(renderLessonReviewView());
+    else if (st.currentView === 'teacher')              content.appendChild(renderTeacherView());
+    else if (st.currentView === 'admin')                content.appendChild(renderAdminView());
+    else if (st.currentView === 'attempts')             content.appendChild(renderAttemptsPage());
+    else if (st.currentView === 'attempt_history')      content.appendChild(renderAttemptHistoryView());
+    else if (st.currentView === 'attempt_detail_from_history') content.appendChild(renderAttemptDetailFromHistoryPage());
+    else if (st.currentView === 'attempt_detail')       content.appendChild(renderAttemptDetailPage());
+    else if (st.currentView === 'attempt_compare')      content.appendChild(renderAttemptComparePage());
+    else if (st.currentView === 'path')                 content.appendChild(renderPathView());
+    else if (st.currentView === 'level_path')           content.appendChild(renderLevelPathView());
+    else if (st.currentView === 'scenario')             content.appendChild(renderScenarioView());
     else content.appendChild(renderDashboard());
 
     main.appendChild(content);
@@ -266,21 +279,26 @@
       col.appendChild(card);
 
     } else if (latestCompleted) {
-      // COMPLETED state
+      // COMPLETED or REVIEW_DUE state
       const band = latestCompleted.result_band;
       const bandLabel = P.getResultBandLabel(band);
       const bandColor = P.getResultBandColor(band);
       const score = latestCompleted.total_score;
       const scenarioTitle = latestCompleted.attempt_summary_json?.transferScenarioTitle || '—';
+      const isReviewDue = P.isLessonReviewDue(lessonId);
+      const accentBar = isReviewDue ? 'var(--amber)' : 'var(--green)';
+      const statusChipHtml = isReviewDue
+        ? `<button class="lx-inline-status-btn lx-chip-reviewdue" data-card-action="review" data-lesson-id="${lessonId}" id="completed-status-btn" aria-label="Review due — open review page">⚡ Review due · Attempt ${latestCompleted.attempt_number}</button>`
+        : `<button class="lx-inline-status-btn status-pill status-pill-completed" data-card-action="review" data-lesson-id="${lessonId}" id="completed-status-btn" aria-label="Review completed lesson">✓ Completed · Attempt ${latestCompleted.attempt_number}</button>`;
 
       const card = el('div', 'lesson-card-lg lx-card-interactive');
       card.setAttribute('role', 'article');
       card.setAttribute('tabindex', '0');
-      card.setAttribute('aria-label', lesson.title + ' — Completed. Press Enter to review.');
+      card.setAttribute('aria-label', lesson.title + (isReviewDue ? ' — Review due. Press Enter to review.' : ' — Completed. Press Enter to review.'));
       card.dataset.cardAction = 'review';
       card.dataset.lessonId = lessonId;
       card.innerHTML = `
-      <div class="lesson-card-accent-bar" style="background:var(--green)"></div>
+      <div class="lesson-card-accent-bar" style="background:${accentBar}"></div>
       <div class="lesson-card-body">
         <div class="lesson-card-meta">
           ${_cefrBadgeBtn('A1')}
@@ -290,8 +308,8 @@
         <button class="lesson-title-link lx-card-title-btn" data-card-action="review" data-lesson-id="${lessonId}" aria-label="Review: ${esc(lesson.title)}">${esc(lesson.title)}</button>
         <div class="lesson-objective">${esc(lesson.objective)}</div>
 
-        <div style="background:var(--green-light);border-radius:8px;padding:12px 14px;margin:12px 0;border:1px solid var(--green)">
-          <button class="lx-inline-status-btn status-pill status-pill-completed" data-card-action="review" data-lesson-id="${lessonId}" id="completed-status-btn" aria-label="Review completed lesson">✓ Completed · Attempt ${latestCompleted.attempt_number}</button>
+        <div style="background:${isReviewDue ? 'var(--amber-light)' : 'var(--green-light)'};border-radius:8px;padding:12px 14px;margin:12px 0;border:1px solid ${isReviewDue ? 'var(--amber)' : 'var(--green)'}">
+          ${statusChipHtml}
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">
             <div style="font-size:13px;color:var(--navy)">Latest score: <strong>${score !== null ? score + '/16' : '—'}</strong></div>
             <div style="font-size:13px;color:${bandColor};font-weight:700">${bandLabel}</div>
@@ -303,8 +321,8 @@
         <div class="lesson-card-footer-lg" style="flex-wrap:wrap;gap:8px">
           <button class="btn-review lx-card-primary-btn" id="review-lesson-btn" data-lesson-id="${lessonId}">📖 Review Lesson</button>
           <button class="lx-card-arrow-btn" data-card-action="review" data-lesson-id="${lessonId}" aria-label="Review lesson">→</button>
-          <button class="btn-outline-sm" id="new-attempt-btn">⊕ New Attempt</button>
-          <button class="btn-outline-sm" id="view-attempts-btn-card">Lesson History</button>
+          <button class="btn-outline-sm" id="new-attempt-btn">🔄 Restart</button>
+          <button class="btn-outline-sm" id="view-attempts-btn-card">📋 History (${allAttempts.length})</button>
         </div>
       </div>`;
       col.appendChild(card);
@@ -457,71 +475,150 @@
   }
 
   // ══════════════════════════════════════════════
-  // ── LESSON REVIEW VIEW  (#/lesson/:id/review) ──
+  // ── LESSON REVIEW VIEW  (#/lesson/:id/review) — Module D ──
   // ══════════════════════════════════════════════
   function renderLessonReviewView() {
-    const lessonId = st.reviewLessonId || 'A1-BE-LOST-PROPERTY-001';
+    const lessonId = st.reviewLessonId || P.LESSON_ID;
     const currLesson = LX.curriculum.getLessonById(lessonId) || LX.lesson_A1_001;
-    const allAttempts = P.getAllAttempts().filter(a => a.status === 'COMPLETED');
+    const allAttempts = P.getAllAttempts();
+    const completedAttempts = allAttempts.filter(a => a.status === 'COMPLETED');
     const latestCompleted = P.getLatestCompletedAttempt();
+    const activeAttempt = P.getActiveAttempt();
     const fam = (LX.scenarioFamilies || []).find(f => f.id === currLesson.scenarioFamily);
     const familyLabel = fam ? (fam.emoji + ' ' + fam.name) : (currLesson.scenarioFamily || '');
+    const allReviews = latestCompleted ? P.getReviewEvents(latestCompleted.id) : [];
+    const now = new Date();
+    const isReviewDue = P.isLessonReviewDue(lessonId);
 
     const div = el('div', 'lx-review-page');
-    div.innerHTML = `
-    <div class="lx-review-header">
+
+    // ── Header ──
+    const header = el('div', 'lx-review-header');
+    header.innerHTML = `
       <div class="lx-review-breadcrumb">
         <button class="nav-back-btn" id="review-back-dashboard-btn">← Dashboard</button>
       </div>
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
         ${_cefrBadgeBtn(currLesson.cefrLevel || 'A1')}
         <span class="lesson-family">${familyLabel}</span>
+        ${isReviewDue
+          ? `<span class="lx-avail-chip lx-chip-reviewdue">⚡ Review due</span>`
+          : completedAttempts.length > 0
+            ? `<span class="lx-avail-chip lx-chip-completed">✓ Completed</span>`
+            : ''}
       </div>
       <h1 class="lx-review-title">${esc(currLesson.title)}</h1>
       <p class="lx-review-objective">${esc(currLesson.objective)}</p>
-    </div>
+      ${latestCompleted ? `<p style="font-size:12px;color:var(--grey);margin:4px 0 0">Last completed: ${P.formatDateTime(latestCompleted.completed_at)} &nbsp;·&nbsp; Attempt ${latestCompleted.attempt_number} of ${allAttempts.length}</p>` : ''}`;
+    div.appendChild(header);
 
-    <div class="lx-review-actions">
-      <div class="lx-review-action-card">
-        <div class="lx-review-action-icon">📖</div>
-        <div class="lx-review-action-title">Review Lesson</div>
-        <div class="lx-review-action-desc">Go through the lesson content again and revisit each stage.</div>
-        <button class="btn-start lx-review-action-btn" id="review-go-lesson-btn">Open Lesson →</button>
-      </div>
+    // ── Last attempt summary (if any completed attempt exists) ──
+    if (latestCompleted) {
+      const band = latestCompleted.result_band;
+      const bandColor = P.getResultBandColor(band);
+      const bandLabel = P.getResultBandLabel(band);
+      const duration = P.formatDuration(latestCompleted.active_duration_seconds || latestCompleted.duration_seconds);
+      const rubricScores = latestCompleted.attempt_summary_json?.rubricScores || {};
+      const dims = LX.lesson_A1_001.rubric.dimensions;
 
-      <div class="lx-review-action-card lx-review-action-card--coming">
-        <div class="lx-review-action-icon">🔄</div>
-        <div class="lx-review-action-title">Restart Lesson</div>
-        <div class="lx-review-action-desc">Start a new attempt from the beginning to improve your score.</div>
-        <div class="lx-coming-badge">Coming in Module D</div>
-      </div>
-
-      <div class="lx-review-action-card lx-review-action-card--coming">
-        <div class="lx-review-action-icon">📊</div>
-        <div class="lx-review-action-title">View Attempt History</div>
-        <div class="lx-review-action-desc">Compare all your attempts and track your progress over time.</div>
-        ${allAttempts.length > 0 ? `<button class="btn-outline-sm" id="review-go-attempts-btn">View ${allAttempts.length} attempt${allAttempts.length !== 1 ? 's' : ''} →</button>` : '<div class="lx-coming-badge">Coming in Module D</div>'}
-      </div>
-    </div>
-
-    ${latestCompleted ? `
-    <div class="lx-review-summary">
-      <div class="sidebar-card-title" style="margin-bottom:12px">📝 Latest Attempt Summary</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">
-        <div class="lx-review-stat">
-          <div class="lx-review-stat-val" style="color:var(--green)">${latestCompleted.total_score !== null ? latestCompleted.total_score + '/16' : '—'}</div>
-          <div class="lx-review-stat-label">Score</div>
+      const summaryEl = el('div', 'lx-review-summary');
+      summaryEl.innerHTML = `
+        <div class="sidebar-card-title" style="margin-bottom:14px">📝 Last Attempt Summary — Attempt ${latestCompleted.attempt_number}</div>
+        <div class="lx-review-stats-grid">
+          <div class="lx-review-stat">
+            <div class="lx-review-stat-val" style="color:var(--green)">${latestCompleted.total_score !== null ? latestCompleted.total_score + '/16' : '—'}</div>
+            <div class="lx-review-stat-label">Overall Score</div>
+          </div>
+          <div class="lx-review-stat">
+            <div class="lx-review-stat-val" style="color:${bandColor}">${bandLabel}</div>
+            <div class="lx-review-stat-label">Mastery Band</div>
+          </div>
+          <div class="lx-review-stat">
+            <div class="lx-review-stat-val">${duration}</div>
+            <div class="lx-review-stat-label">Duration</div>
+          </div>
+          <div class="lx-review-stat">
+            <div class="lx-review-stat-val" style="font-size:14px">${P.formatDate(latestCompleted.completed_at)}</div>
+            <div class="lx-review-stat-label">Completed</div>
+          </div>
         </div>
-        <div class="lx-review-stat">
-          <div class="lx-review-stat-val" style="color:${P.getResultBandColor(latestCompleted.result_band)}">${P.getResultBandLabel(latestCompleted.result_band)}</div>
-          <div class="lx-review-stat-label">Result</div>
-        </div>
-        <div class="lx-review-stat">
-          <div class="lx-review-stat-val">${P.formatDate(latestCompleted.completed_at)}</div>
-          <div class="lx-review-stat-label">Completed</div>
-        </div>
-      </div>
-    </div>` : ''}`;
+        ${dims.length > 0 && Object.keys(rubricScores).length > 0 ? `
+        <div class="lx-review-rubric">
+          <div style="font-size:12px;font-weight:700;color:var(--grey);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">8-Dimension Rubric</div>
+          <div class="lx-review-rubric-grid">
+            ${dims.map(dim => {
+              const score = rubricScores[dim.id] || 0;
+              const dots = [0,1,2].map(d =>
+                `<span class="lx-rdot${d < score ? ' lx-rdot-filled' : ''}"></span>`
+              ).join('');
+              return `<div class="lx-review-rubric-row">
+                <span class="lx-review-rubric-label">${esc(dim.label)}</span>
+                <span class="lx-review-rubric-dots">${dots}</span>
+                <span class="lx-review-rubric-score">${score}/${dim.max}</span>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>` : ''}`;
+      div.appendChild(summaryEl);
+    }
+
+    // ── Action cards ──
+    const actionsEl = el('div', 'lx-review-actions');
+    // Card 1: Review Lesson (resume existing active attempt at last stage)
+    const reviewCard = el('div', 'lx-review-action-card');
+    reviewCard.innerHTML = `
+      <div class="lx-review-action-icon">📖</div>
+      <div class="lx-review-action-title">Review Lesson</div>
+      <div class="lx-review-action-desc">Resume your current attempt and revisit each stage. Your progress and scores are preserved.</div>
+      <button class="btn-start lx-review-action-btn" id="review-go-lesson-btn" aria-label="Open lesson for review">Open Lesson →</button>`;
+    actionsEl.appendChild(reviewCard);
+
+    // Card 2: Restart Lesson (new attempt, immutable previous)
+    const restartCard = el('div', 'lx-review-action-card lx-review-action-card--restart');
+    restartCard.innerHTML = `
+      <div class="lx-review-action-icon">🔄</div>
+      <div class="lx-review-action-title">Restart Lesson</div>
+      <div class="lx-review-action-desc">Start a brand-new attempt from stage 1. Previous attempts are saved and never overwritten.</div>
+      <button class="btn-outline lx-review-action-btn lx-restart-btn" id="review-restart-btn" aria-label="Restart lesson from the beginning">Restart from beginning →</button>`;
+    actionsEl.appendChild(restartCard);
+
+    // Card 3: View Attempt History
+    const historyCard = el('div', 'lx-review-action-card');
+    historyCard.innerHTML = `
+      <div class="lx-review-action-icon">📊</div>
+      <div class="lx-review-action-title">View Attempt History</div>
+      <div class="lx-review-action-desc">See all ${allAttempts.length} attempt${allAttempts.length !== 1 ? 's' : ''}, compare scores, and review individual stage results.</div>
+      <button class="btn-outline-sm lx-review-action-btn" id="review-go-history-btn" aria-label="View attempt history for this lesson">View history (${allAttempts.length}) →</button>`;
+    actionsEl.appendChild(historyCard);
+
+    div.appendChild(actionsEl);
+
+    // ── Spaced-review plan ──
+    if (allReviews.length > 0) {
+      const reviewPlanEl = el('div', 'lx-review-plan');
+      const icons = ['⚡','📝','🎯','💬','🚀','🔄'];
+      reviewPlanEl.innerHTML = `
+        <div class="sidebar-card-title" style="margin-bottom:14px">📅 Spaced-Review Plan</div>
+        <div class="lx-review-plan-list">
+          ${allReviews.map((ev, i) => {
+            const due = new Date(ev.scheduled_for);
+            const isDue = ev.status !== 'COMPLETED' && due <= now;
+            const isComplete = ev.status === 'COMPLETED';
+            const statusCls = isComplete ? 'lx-rp-done' : isDue ? 'lx-rp-due' : 'lx-rp-upcoming';
+            const statusLabel = isComplete ? '✓ Done' : isDue ? '⚡ Due now' : `Due ${P.formatDate(ev.scheduled_for)}`;
+            return `<div class="lx-review-plan-row ${statusCls}" data-review-event-id="${ev.id}">
+              <span class="lx-rp-icon">${icons[i] || '📅'}</span>
+              <div class="lx-rp-info">
+                <div class="lx-rp-label">${_reviewTypeLabel(ev.review_type)}</div>
+                <div class="lx-rp-status">${statusLabel}</div>
+              </div>
+              ${isDue ? `<button class="btn-outline-sm lx-rp-mark-done-btn" data-review-event-id="${ev.id}" aria-label="Mark review as complete">Mark done</button>` : ''}
+            </div>`;
+          }).join('')}
+        </div>`;
+      div.appendChild(reviewPlanEl);
+    }
+
     return div;
   }
 
@@ -543,9 +640,10 @@
       if (a.status === 'IN_PROGRESS') lp[lid].inProgress = true;
     });
 
-    // Mark review-due lessons (AVAILABLE review events = due)
+    // Mark review-due lessons — any non-completed review event scheduled for now or earlier
+    const now = new Date();
     allReviews.forEach(ev => {
-      if (ev.status === 'AVAILABLE') {
+      if (ev.status !== 'COMPLETED' && new Date(ev.scheduled_for) <= now) {
         const lid = ev.lesson_id || P.LESSON_ID;
         if (!lp[lid]) lp[lid] = { completed: false, inProgress: false, reviewDue: false };
         lp[lid].reviewDue = true;
@@ -2305,6 +2403,283 @@
   }
 
   // ══════════════════════════════════════════════
+  // ── ATTEMPT HISTORY PAGE  (#/attempts/:lessonId) — Module D ──
+  // ══════════════════════════════════════════════
+  function renderAttemptHistoryView() {
+    const lessonId = st.historyLessonId || P.LESSON_ID;
+    const currLesson = LX.curriculum.getLessonById(lessonId) || LX.lesson_A1_001;
+    const allAttempts = P.getAllAttempts(); // newest first
+    const fam = (LX.scenarioFamilies || []).find(f => f.id === currLesson.scenarioFamily);
+    const familyLabel = fam ? (fam.emoji + ' ' + fam.name) : (currLesson.scenarioFamily || '');
+
+    const div = el('div', 'lx-attempt-history-page');
+
+    // ── Header ──
+    const header = el('div', 'lx-ah-header');
+    header.innerHTML = `
+      <div class="lx-ah-breadcrumb">
+        <button class="nav-back-btn" id="ah-back-review-btn">← Back to Review</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0">
+        ${_cefrBadgeBtn(currLesson.cefrLevel || 'A1')}
+        <span class="lesson-family">${familyLabel}</span>
+      </div>
+      <h1 class="lx-ah-title">📋 Attempt History — ${esc(currLesson.title)}</h1>
+      <p class="lx-ah-subtitle">${allAttempts.length} attempt${allAttempts.length !== 1 ? 's' : ''} recorded</p>`;
+    div.appendChild(header);
+
+    if (allAttempts.length === 0) {
+      const empty = el('div', 'empty-state');
+      empty.innerHTML = `<div class="empty-state-icon">📋</div><div class="empty-state-text">No attempts yet. Start a lesson to see your history here.</div>`;
+      div.appendChild(empty);
+      return div;
+    }
+
+    // ── Action bar ──
+    const actionBar = el('div', 'lx-ah-action-bar');
+    actionBar.innerHTML = `
+      <button class="btn-start" id="ah-restart-btn" aria-label="Start a new attempt">🔄 New Attempt</button>
+      ${P.getAllAttempts().filter(a => a.status === 'COMPLETED').length >= 2
+        ? `<button class="btn-outline-sm" id="ah-compare-btn" aria-label="Compare attempts">📊 Compare</button>` : ''}`;
+    div.appendChild(actionBar);
+
+    // ── Attempt list ──
+    const list = el('div', 'lx-ah-list');
+    allAttempts.forEach((attempt, idx) => {
+      const isCompleted = attempt.status === 'COMPLETED';
+      const isInProgress = attempt.status === 'IN_PROGRESS';
+      const band = attempt.result_band;
+      const bandColor = P.getResultBandColor(band);
+      const bandLabel = P.getResultBandLabel(band);
+      const duration = isCompleted
+        ? P.formatDuration(attempt.active_duration_seconds || attempt.duration_seconds)
+        : P.formatDuration(attempt.active_duration_seconds);
+      const score = attempt.total_score;
+
+      const card = el('div', `lx-ah-card${isInProgress ? ' lx-ah-card-inprogress' : ''}`);
+      card.setAttribute('tabindex', '0');
+      card.setAttribute('role', 'article');
+      card.setAttribute('aria-label', `Attempt ${attempt.attempt_number}: ${isCompleted ? 'Completed' : 'In progress'}`);
+      card.innerHTML = `
+        <div class="lx-ah-card-header">
+          <div class="lx-ah-card-num">
+            <span class="lx-ah-attempt-badge">Attempt ${attempt.attempt_number}</span>
+            ${isInProgress
+              ? `<span class="lx-avail-chip lx-chip-inprogress" style="font-size:11px">▶ In progress</span>`
+              : `<span class="lx-avail-chip lx-chip-completed" style="font-size:11px">✓ Completed</span>`}
+          </div>
+          <div class="lx-ah-card-actions">
+            ${isCompleted
+              ? `<button class="btn-outline-sm lx-ah-view-btn" data-attempt-id="${attempt.id}" data-lesson-id="${lessonId}" aria-label="View details for attempt ${attempt.attempt_number}">View Details</button>`
+              : `<button class="btn-continue lx-ah-resume-btn" data-attempt-id="${attempt.id}" aria-label="Resume attempt ${attempt.attempt_number}" style="font-size:12px;padding:6px 14px">▶ Resume</button>`}
+          </div>
+        </div>
+        <div class="lx-ah-card-meta">
+          <div class="lx-ah-meta-item">
+            <span class="lx-ah-meta-label">Started</span>
+            <span class="lx-ah-meta-val">${P.formatDateTime(attempt.started_at)}</span>
+          </div>
+          ${isCompleted ? `
+          <div class="lx-ah-meta-item">
+            <span class="lx-ah-meta-label">Completed</span>
+            <span class="lx-ah-meta-val">${P.formatDateTime(attempt.completed_at)}</span>
+          </div>
+          <div class="lx-ah-meta-item">
+            <span class="lx-ah-meta-label">Duration</span>
+            <span class="lx-ah-meta-val">${duration}</span>
+          </div>
+          <div class="lx-ah-meta-item">
+            <span class="lx-ah-meta-label">Score</span>
+            <span class="lx-ah-meta-val" style="color:var(--green);font-weight:700">${score !== null ? score + '/16' : '—'}</span>
+          </div>
+          <div class="lx-ah-meta-item">
+            <span class="lx-ah-meta-label">Result</span>
+            <span class="lx-ah-meta-val" style="color:${bandColor};font-weight:700">${bandLabel}</span>
+          </div>` : `
+          <div class="lx-ah-meta-item">
+            <span class="lx-ah-meta-label">Progress</span>
+            <span class="lx-ah-meta-val">${attempt.completion_percent}% complete</span>
+          </div>`}
+        </div>`;
+      list.appendChild(card);
+    });
+    div.appendChild(list);
+
+    return div;
+  }
+
+  // ══════════════════════════════════════════════
+  // ── ATTEMPT DETAIL FROM HISTORY  (#/attempts/:lessonId/:attemptId) — Module D ──
+  // ══════════════════════════════════════════════
+  function renderAttemptDetailFromHistoryPage() {
+    const lessonId = st.historyLessonId || P.LESSON_ID;
+    const attemptId = st.selectedAttemptId || st.readOnlyAttemptId;
+    const attempt = attemptId ? P.getAttempt(attemptId) : null;
+    const currLesson = LX.curriculum.getLessonById(lessonId) || LX.lesson_A1_001;
+    const fam = (LX.scenarioFamilies || []).find(f => f.id === currLesson.scenarioFamily);
+    const familyLabel = fam ? (fam.emoji + ' ' + fam.name) : (currLesson.scenarioFamily || '');
+
+    const div = el('div', 'lx-attempt-detail-page');
+
+    if (!attempt) {
+      div.innerHTML = `<div style="padding:40px;text-align:center;color:var(--grey)"><div style="font-size:40px;margin-bottom:12px">🔍</div><div>Attempt not found.</div><button class="nav-back-btn" id="adfh-back-btn" style="margin-top:16px">← Back to History</button></div>`;
+      return div;
+    }
+
+    const isInProgress = attempt.status === 'IN_PROGRESS';
+    const band = attempt.result_band;
+    const bandColor = P.getResultBandColor(band);
+    const bandLabel = P.getResultBandLabel(band);
+    const stageAttempts = P.getStageAttempts(attemptId);
+    const reviewEvents = P.getReviewEvents(attemptId);
+    const rubricScores = attempt.attempt_summary_json?.rubricScores || {};
+    const dims = LX.lesson_A1_001.rubric.dimensions;
+
+    // ── Header ──
+    const header = el('div', 'lx-ah-header');
+    header.innerHTML = `
+      <div class="lx-ah-breadcrumb">
+        <button class="nav-back-btn" id="adfh-back-btn">← Back to History</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0">
+        ${_cefrBadgeBtn(currLesson.cefrLevel || 'A1')}
+        <span class="lesson-family">${familyLabel}</span>
+        ${isInProgress
+          ? `<span class="lx-avail-chip lx-chip-inprogress" style="font-size:11px">▶ In progress</span>`
+          : `<span class="lx-avail-chip lx-chip-completed" style="font-size:11px">✓ Completed</span>`}
+      </div>
+      <h1 class="lx-ah-title">Attempt ${attempt.attempt_number} — ${esc(currLesson.title)}</h1>`;
+    div.appendChild(header);
+
+    // ── Attempt metadata card ──
+    const metaCard = el('div', 'lx-ah-detail-meta-card');
+    metaCard.innerHTML = `
+      <div class="lx-ah-detail-meta-grid">
+        <div class="lx-ah-dm-cell"><div class="lx-ah-dm-label">Attempt</div><div class="lx-ah-dm-val">Attempt ${attempt.attempt_number}</div></div>
+        <div class="lx-ah-dm-cell"><div class="lx-ah-dm-label">Status</div><div class="lx-ah-dm-val" style="color:${isInProgress ? 'var(--accent)' : 'var(--green)'}">${isInProgress ? '▶ In progress' : '✓ Completed'}</div></div>
+        <div class="lx-ah-dm-cell"><div class="lx-ah-dm-label">Started</div><div class="lx-ah-dm-val">${P.formatDateTime(attempt.started_at)}</div></div>
+        ${!isInProgress ? `<div class="lx-ah-dm-cell"><div class="lx-ah-dm-label">Completed</div><div class="lx-ah-dm-val">${P.formatDateTime(attempt.completed_at)}</div></div>` : ''}
+        ${!isInProgress ? `<div class="lx-ah-dm-cell"><div class="lx-ah-dm-label">Duration</div><div class="lx-ah-dm-val">${P.formatDuration(attempt.active_duration_seconds || attempt.duration_seconds)}</div></div>` : ''}
+        ${!isInProgress ? `<div class="lx-ah-dm-cell"><div class="lx-ah-dm-label">Score</div><div class="lx-ah-dm-val lx-big-score">${attempt.total_score !== null ? attempt.total_score + '/16' : '—'}</div></div>` : ''}
+        ${!isInProgress ? `<div class="lx-ah-dm-cell"><div class="lx-ah-dm-label">Result</div><div class="lx-ah-dm-val" style="font-size:18px;font-weight:800;color:${bandColor}">${bandLabel}</div></div>` : ''}
+      </div>
+      ${isInProgress
+        ? `<div style="margin-top:14px"><button class="btn-continue lx-ah-resume-btn-detail" data-attempt-id="${attemptId}" aria-label="Resume this in-progress attempt">▶ Resume this attempt</button></div>`
+        : ''}`;
+    div.appendChild(metaCard);
+
+    // ── Rubric breakdown ──
+    if (!isInProgress && dims.length > 0 && Object.keys(rubricScores).length > 0) {
+      const rubricCard = el('div', 'lx-ah-detail-section');
+      rubricCard.innerHTML = `
+        <div class="lx-ah-detail-section-title">📊 Rubric Breakdown</div>
+        <div class="lx-ah-rubric-grid">
+          ${dims.map(dim => {
+            const score = rubricScores[dim.id] || 0;
+            const dots = [0,1,2].map(d =>
+              `<span class="lx-rdot${d < score ? ' lx-rdot-filled' : ''}"></span>`
+            ).join('');
+            return `<div class="lx-ah-rubric-row">
+              <span class="lx-ah-rubric-label">${esc(dim.label)}</span>
+              <span class="lx-ah-rubric-dots">${dots}</span>
+              <span class="lx-ah-rubric-score">${score}/${dim.max}</span>
+            </div>`;
+          }).join('')}
+        </div>`;
+      div.appendChild(rubricCard);
+    }
+
+    // ── Per-stage results ──
+    const stagesSection = el('div', 'lx-ah-detail-section');
+    stagesSection.innerHTML = `<div class="lx-ah-detail-section-title">🗂️ Stage-by-Stage Results</div>`;
+
+    LX.STAGES.forEach(stage => {
+      const sa = stageAttempts[stage.id];
+      if (!sa) return; // skip unstored stages
+      const statusInfo = _stageStatusBadge(sa.status);
+      const hasScore = sa.score !== null && sa.score !== undefined && sa.max_score;
+      const keyResponses = _summariseStageResponses(stage.id, sa.response_data_json);
+
+      const rowEl = el('div', 'lx-ah-stage-row');
+      rowEl.innerHTML = `
+        <div class="lx-ah-stage-icon">${LX.STAGES.find(s => s.id === stage.id)?.icon || '📋'}</div>
+        <div class="lx-ah-stage-info">
+          <div class="lx-ah-stage-name">${esc(stage.label)}</div>
+          ${keyResponses ? `<div class="lx-ah-stage-responses">${keyResponses}</div>` : ''}
+        </div>
+        <div class="lx-ah-stage-right">
+          <span class="lx-ah-stage-status-badge ${statusInfo.cls}">${statusInfo.icon} ${statusInfo.label}</span>
+          ${hasScore ? `<span class="lx-ah-stage-score">${sa.score}/${sa.max_score}</span>` : ''}
+        </div>`;
+      stagesSection.appendChild(rowEl);
+    });
+
+    div.appendChild(stagesSection);
+
+    // ── Review events ──
+    if (reviewEvents.length > 0) {
+      const reviewSec = el('div', 'lx-ah-detail-section');
+      const now = new Date();
+      reviewSec.innerHTML = `
+        <div class="lx-ah-detail-section-title">📅 Spaced-Review Events</div>
+        ${reviewEvents.map((ev, i) => {
+          const due = new Date(ev.scheduled_for);
+          const isDue = ev.status !== 'COMPLETED' && due <= now;
+          const isComplete = ev.status === 'COMPLETED';
+          const icons2 = ['⚡','📝','🎯','💬','🚀','🔄'];
+          const statusLabel = isComplete ? '✓ Done' : isDue ? '⚡ Due now' : `Due ${P.formatDate(ev.scheduled_for)}`;
+          return `<div class="lx-rp-row-compact">
+            <span class="lx-rp-icon">${icons2[i] || '📅'}</span>
+            <span class="lx-rp-label">${_reviewTypeLabel(ev.review_type)}</span>
+            <span class="lx-rp-date">${P.formatDate(ev.scheduled_for)}</span>
+            <span class="lx-rp-status-badge ${isComplete ? 'lx-rp-done' : isDue ? 'lx-rp-due' : 'lx-rp-upcoming'}">${statusLabel}</span>
+          </div>`;
+        }).join('')}`;
+      div.appendChild(reviewSec);
+    }
+
+    return div;
+  }
+
+  /** Build a compact key-response summary string for a stage, safe-escaped. */
+  function _summariseStageResponses(stageKey, data) {
+    if (!data) return '';
+    const parts = [];
+    if (stageKey === 'practice') {
+      ['recognition','matching','controlledProduction','questionTransform'].forEach(k => {
+        const d = data[k];
+        if (d && d.checked && d.total > 0) {
+          parts.push(`${k.replace(/([A-Z])/g,' $1').toLowerCase()}: ${d.score}/${d.total}`);
+        }
+      });
+    } else if (stageKey === 'dialogue') {
+      if (data.partAChecked) parts.push(`Part A: ${data.partAScore}/${data.partATotal}`);
+      if (data.partBChecked) parts.push(`Part B: ${data.partBScore}/${data.partBTotal}`);
+    } else if (stageKey === 'infogap') {
+      if (data.completed) parts.push(`Info gap: ${data.score}/${data.total}`);
+    } else if (stageKey === 'transfer') {
+      if (data.submitted) parts.push('Transfer submitted');
+      if (data.score !== null && data.score !== undefined) parts.push(`score: ${data.score}`);
+    } else if (['visual','grammar','coresentence','vocabulary','phrases'].includes(stageKey)) {
+      if (data.submitted && data.total > 0) parts.push(`Check: ${data.score}/${data.total}`);
+    }
+    return parts.length > 0 ? esc(parts.join(' · ')) : '';
+  }
+
+  function _stageStatusBadge(status) {
+    const SS = P.STAGE_STATUS;
+    switch (status) {
+      case SS.COMPLETED:    return { cls: 'lx-sb-completed', icon: '✓', label: 'Completed' };
+      case SS.NEEDS_REVIEW: return { cls: 'lx-sb-review',    icon: '⚠', label: 'Needs review' };
+      case SS.ATTEMPTED:    return { cls: 'lx-sb-attempted', icon: '◑', label: 'Attempted' };
+      case SS.IN_PROGRESS:  return { cls: 'lx-sb-inprogress',icon: '▶', label: 'In progress' };
+      case SS.VIEWED:       return { cls: 'lx-sb-viewed',    icon: '👁', label: 'Viewed' };
+      case SS.NOT_ASSESSED: return { cls: 'lx-sb-viewed',    icon: '—', label: 'Not assessed' };
+      default:              return { cls: 'lx-sb-default',   icon: '·', label: 'Not started' };
+    }
+  }
+
+  // ══════════════════════════════════════════════
   // ── ATTEMPT DETAIL (READ-ONLY HISTORICAL VIEW) ──
   // ══════════════════════════════════════════════
   function renderAttemptDetailPage() {
@@ -3089,7 +3464,7 @@
     if (newAttemptBtnDash) {
       newAttemptBtnDash.addEventListener('click', (e) => {
         e.stopPropagation();
-        _showNewAttemptConfirm();
+        _showRestartConfirm();
       });
     }
 
@@ -3097,7 +3472,7 @@
     if (viewAttemptsBtnCard) {
       viewAttemptsBtnCard.addEventListener('click', (e) => {
         e.stopPropagation();
-        navigate('/attempts');
+        navigate('/attempts/' + P.LESSON_ID);
       });
     }
 
@@ -3112,7 +3487,7 @@
       });
     }
 
-    // ── LESSON REVIEW PAGE buttons ──
+    // ── LESSON REVIEW PAGE buttons — Module D ──
     const reviewBackBtn = document.getElementById('review-back-dashboard-btn');
     if (reviewBackBtn) reviewBackBtn.addEventListener('click', () => navigate(''));
 
@@ -3121,8 +3496,39 @@
       reviewGoLessonBtn.addEventListener('click', () => _startOrResumeLesson(false));
     }
 
+    // Restart Lesson button — opens confirm modal
+    const reviewRestartBtn = document.getElementById('review-restart-btn');
+    if (reviewRestartBtn) {
+      reviewRestartBtn.addEventListener('click', () => {
+        _showRestartConfirm();
+      });
+    }
+
+    // View attempt history from review page
+    const reviewGoHistoryBtn = document.getElementById('review-go-history-btn');
+    if (reviewGoHistoryBtn) {
+      const lid = st.reviewLessonId || P.LESSON_ID;
+      reviewGoHistoryBtn.addEventListener('click', () => navigate('/attempts/' + lid));
+    }
+
+    // Legacy: older "view attempts" button from Module B
     const reviewGoAttemptsBtn = document.getElementById('review-go-attempts-btn');
-    if (reviewGoAttemptsBtn) reviewGoAttemptsBtn.addEventListener('click', () => navigate('/attempts'));
+    if (reviewGoAttemptsBtn) {
+      const lid2 = st.reviewLessonId || P.LESSON_ID;
+      reviewGoAttemptsBtn.addEventListener('click', () => navigate('/attempts/' + lid2));
+    }
+
+    // Mark review event as done (spaced-review plan on review page)
+    $$('.lx-rp-mark-done-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const eventId = btn.dataset.reviewEventId;
+        if (eventId) {
+          P.markReviewComplete(eventId);
+          render(); // re-render to reflect updated state
+        }
+      });
+    });
 
     // ── PATH VIEW buttons (Module C: .lx-path-card-c) ──
     const pathBackBtn = document.getElementById('path-back-btn');
@@ -3671,6 +4077,63 @@
     const newAttemptBtnHistory = document.getElementById('new-attempt-btn-history');
     if (newAttemptBtnHistory) newAttemptBtnHistory.addEventListener('click', _showNewAttemptConfirm);
 
+    // ── ATTEMPT HISTORY PAGE buttons (Module D) ──
+    const ahBackReviewBtn = document.getElementById('ah-back-review-btn');
+    if (ahBackReviewBtn) {
+      const lid = st.historyLessonId || P.LESSON_ID;
+      ahBackReviewBtn.addEventListener('click', () => navigate('/lesson/' + lid + '/review'));
+    }
+
+    const ahRestartBtn = document.getElementById('ah-restart-btn');
+    if (ahRestartBtn) ahRestartBtn.addEventListener('click', () => _showRestartConfirm());
+
+    const ahCompareBtn = document.getElementById('ah-compare-btn');
+    if (ahCompareBtn) {
+      ahCompareBtn.addEventListener('click', () => {
+        const completed = P.getAllAttempts().filter(a => a.status === 'COMPLETED');
+        if (completed.length >= 2) st.compareAttemptIds = [completed[completed.length - 1].id, completed[0].id];
+        navigate('/attempts/compare');
+      });
+    }
+
+    // "View Details" buttons on attempt history cards → navigate to detail-from-history
+    $$('.lx-ah-view-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const aid = btn.dataset.attemptId;
+        const lid = btn.dataset.lessonId || st.historyLessonId || P.LESSON_ID;
+        st.historyLessonId = lid;
+        st.selectedAttemptId = aid;
+        st.readOnlyAttemptId = aid;
+        navigate('/attempts/' + lid + '/' + aid);
+      });
+    });
+
+    // "Resume" buttons on attempt history cards
+    $$('.lx-ah-resume-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const aid = btn.dataset.attemptId;
+        _resumeAttemptById(aid);
+      });
+    });
+
+    // ── ATTEMPT DETAIL FROM HISTORY buttons (Module D) ──
+    const adfhBackBtn = document.getElementById('adfh-back-btn');
+    if (adfhBackBtn) {
+      const lid = st.historyLessonId || P.LESSON_ID;
+      adfhBackBtn.addEventListener('click', () => navigate('/attempts/' + lid));
+    }
+
+    // "Resume" button inside attempt detail from history
+    $$('.lx-ah-resume-btn-detail').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const aid = btn.dataset.attemptId;
+        _resumeAttemptById(aid);
+      });
+    });
+
     const compareAttemptsPage = document.getElementById('compare-attempts-btn-page');
     if (compareAttemptsPage) {
       compareAttemptsPage.addEventListener('click', () => {
@@ -3823,6 +4286,134 @@
       _resetRuntimeState();
       _startOrResumeLesson(true);
     });
+  }
+
+  /**
+   * Module D — Restart confirm modal.
+   * Shown when learner clicks "Restart Lesson" from the review page.
+   * Focus-trapped; dismissible with Esc.
+   */
+  function _showRestartConfirm() {
+    const existing = document.getElementById('lx-restart-modal');
+    if (existing) existing.remove();
+
+    const modal = el('div', 'lx-modal-overlay');
+    modal.id = 'lx-restart-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'restart-modal-title');
+    modal.innerHTML = `
+    <div class="lx-modal lx-restart-modal-body">
+      <div class="lx-restart-modal-icon" aria-hidden="true">🔄</div>
+      <h2 id="restart-modal-title" class="lx-restart-modal-title">Start a new attempt?</h2>
+      <p class="lx-restart-modal-desc">
+        This will start a new attempt from the beginning.<br>
+        <strong>Your previous attempts will be preserved</strong> — you can review them at any time from the Attempt History page.
+      </p>
+      <div class="lx-restart-modal-actions">
+        <button class="btn-outline-sm" id="restart-modal-cancel" aria-label="Cancel restart">Cancel</button>
+        <button class="btn-start" id="restart-modal-confirm" aria-label="Confirm and start new attempt">Start new attempt →</button>
+      </div>
+    </div>`;
+    document.body.appendChild(modal);
+
+    const cancelBtn = document.getElementById('restart-modal-cancel');
+    const confirmBtn = document.getElementById('restart-modal-confirm');
+    const focusable = [cancelBtn, confirmBtn].filter(Boolean);
+
+    // Focus trap
+    modal.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { modal.remove(); return; }
+      if (e.key === 'Tab') {
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        } else {
+          if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+      }
+    });
+
+    cancelBtn.addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+
+    confirmBtn.addEventListener('click', () => {
+      modal.remove();
+      _resetRuntimeState();
+      _startOrResumeLesson(true);
+    });
+
+    // Initial focus on cancel (safer default)
+    setTimeout(() => { if (cancelBtn) cancelBtn.focus(); }, 50);
+  }
+
+  /**
+   * Resume a specific in-progress attempt by id.
+   * Restores all state from localStorage and navigates to the lesson.
+   */
+  function _resumeAttemptById(attemptId) {
+    const attempt = P.getAttempt(attemptId);
+    if (!attempt || attempt.status !== 'IN_PROGRESS') return;
+
+    st.currentAttemptId = attemptId;
+    st.isReadOnly = false;
+    st.readOnlyAttemptId = null;
+    st.currentStage = attempt.current_stage_index || 0;
+
+    const sas = P.getStageAttempts(attemptId);
+    st.stageStatuses = {};
+    st.stagesCompleted = new Set();
+    Object.entries(sas).forEach(([key, sa]) => {
+      if (sa && sa.status) {
+        st.stageStatuses[key] = sa.status;
+        if ([P.STAGE_STATUS.COMPLETED, P.STAGE_STATUS.VIEWED, P.STAGE_STATUS.ATTEMPTED, P.STAGE_STATUS.NEEDS_REVIEW].includes(sa.status)) {
+          st.stagesCompleted.add(key);
+        }
+      }
+    });
+
+    const practiceData = sas['practice']?.response_data_json;
+    if (practiceData) {
+      if (practiceData.recognition) st.exerciseState.recognition = practiceData.recognition;
+      if (practiceData.matching) st.exerciseState.matching = practiceData.matching;
+      if (practiceData.controlledProduction) st.exerciseState.controlledProduction = practiceData.controlledProduction;
+      if (practiceData.questionTransform) st.exerciseState.questionTransform = practiceData.questionTransform;
+    }
+    const dialogueData = sas['dialogue']?.response_data_json;
+    if (dialogueData && dialogueData.partAChoices !== undefined) {
+      st.dialogueState.partAChoices = dialogueData.partAChoices || {};
+      st.dialogueState.partAChecked = dialogueData.partAChecked || false;
+      st.dialogueState.partAScore = dialogueData.partAScore || 0;
+      st.dialogueState.partATotal = dialogueData.partATotal || 0;
+      st.dialogueState.partBFrames = dialogueData.partBFrames || {};
+      st.dialogueState.partBChecked = dialogueData.partBChecked || false;
+      st.dialogueState.partBScore = dialogueData.partBScore || 0;
+      st.dialogueState.partBTotal = dialogueData.partBTotal || 0;
+      st.dialogueState.completed = dialogueData.completed || false;
+    }
+    ['visual', 'grammar', 'coresentence', 'vocabulary', 'phrases'].forEach(key => {
+      if (sas[key]?.response_data_json) st.stageCheckState[key] = sas[key].response_data_json;
+    });
+    const infoGapData = sas['infogap']?.response_data_json;
+    if (infoGapData) {
+      st.infoGapState.answers = infoGapData.answers || {};
+      st.infoGapState.completed = infoGapData.completed || false;
+      st.infoGapState.score = infoGapData.score || 0;
+      st.infoGapState.total = infoGapData.total || 0;
+    }
+    const transferData = sas['transfer']?.response_data_json;
+    if (transferData) {
+      st.transferState.selectedScenario = transferData.selectedScenario || 0;
+      st.transferState.responses = transferData.responses || {};
+      st.transferState.submitted = transferData.submitted || false;
+    }
+
+    LX.startActiveTimer();
+    LX.scheduleAutoSave();
+    st.currentView = 'lesson';
+    location.hash = '/lesson';
+    render();
   }
 
   // ── HELPER: Finish lesson ──

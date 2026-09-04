@@ -46,6 +46,10 @@
     // Map of unitCode → boolean (is the unit accordion expanded?)
     unitExpanded: {},           // persists across renders within a session
 
+    // Phase 2 Module D — Attempt History routing state
+    historyLessonId: null,      // lesson id for #/attempts/:lessonId
+    selectedAttemptId: null,    // attempt id for #/attempts/:lessonId/:attemptId (detail from history)
+
     // Compare mode
     compareAttemptIds: [null, null],
 
