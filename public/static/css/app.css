@@ -1213,3 +1213,229 @@ table.grammar-table {
   margin-bottom: 16px; box-shadow: var(--shadow-sm);
 }
 
+/* ══════════════════════════════════════════════
+   MODULE C — LEARNING PATH (#/path)
+   ══════════════════════════════════════════════ */
+
+/* ── Priority badges ── */
+.lx-priority-badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px; border-radius: 20px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.lx-pri-p0 { background: #FEF3C7; color: #92400E; border: 1px solid #F59E0B; }
+.lx-pri-p1 { background: var(--accent-light); color: var(--accent); border: 1px solid var(--accent-mid); }
+.lx-pri-p2 { background: var(--grey-bg); color: var(--grey); border: 1px solid var(--border-dark); }
+
+/* ── Availability chips ── */
+.lx-avail-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 20px;
+  font-size: 11px; font-weight: 700; white-space: nowrap;
+}
+.lx-chip-ready      { background: var(--accent-light); color: var(--accent); }
+.lx-chip-inprogress { background: var(--accent-light); color: var(--accent); border: 1.5px solid var(--accent); }
+.lx-chip-completed  { background: var(--green-light); color: var(--green); }
+.lx-chip-reviewdue  { background: #FFF9E6; color: #9A6700; border: 1.5px solid #F6C026; }
+.lx-chip-locked     { background: var(--grey-bg); color: var(--grey-light); }
+.lx-chip-comingsoon { background: #F8F8F8; color: var(--grey-light); border: 1px dashed var(--border-dark); }
+
+/* ── SVG mini ring ── */
+.lx-ring { width: 22px; height: 22px; flex-shrink: 0; }
+
+/* ══════════════════════════════════════════════
+   MODULE C — PATH PAGE LEVEL CARDS (#/path)
+   ══════════════════════════════════════════════ */
+.lx-path-page { max-width: 960px; margin: 0 auto; padding: 0 0 40px; }
+.lx-path-levels-c {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px; margin-bottom: 20px;
+}
+.lx-path-card-c {
+  background: var(--white); border-radius: var(--radius-lg);
+  border: 2px solid var(--border); padding: 18px 18px 14px;
+  cursor: pointer; transition: all 0.18s;
+  text-align: left; font-family: var(--font);
+  display: flex; flex-direction: column; gap: 6px;
+  box-shadow: var(--shadow-sm);
+  width: 100%;
+}
+.lx-path-card-c:hover { border-color: var(--accent-mid); box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.lx-path-card-c:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-lg); }
+.lx-path-card-active { border-color: var(--accent); background: var(--accent-light); }
+.lx-path-card-planned { opacity: 0.8; }
+.lx-path-card-top {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.lx-path-card-arrow { margin-left: auto; color: var(--accent); font-size: 16px; font-weight: 700; transition: transform 0.15s; }
+.lx-path-card-c:hover .lx-path-card-arrow { transform: translateX(3px); }
+.lx-path-card-title { font-size: 15px; font-weight: 800; color: var(--navy); }
+.lx-path-card-desc { font-size: 12px; color: var(--grey); line-height: 1.5; flex: 1; }
+.lx-path-card-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 6px; gap: 8px;
+}
+.lx-path-card-counts { font-size: 11px; color: var(--grey); display: flex; gap: 6px; flex-wrap: wrap; }
+.lx-path-card-progress { display: flex; align-items: center; gap: 4px; }
+.lx-path-card-pct { font-size: 11px; font-weight: 700; color: var(--accent); }
+.lx-path-card-progbar {
+  height: 3px; background: var(--border); border-radius: 2px;
+  overflow: hidden; margin-top: 4px;
+}
+.lx-path-card-progfill { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
+.lx-path-planned-dot { font-size: 11px; color: var(--grey-light); margin-left: auto; }
+.lx-path-legend {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding: 12px 16px; background: var(--white);
+  border-radius: var(--radius-sm); border: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+/* ══════════════════════════════════════════════
+   MODULE C — LEVEL PATH PAGE (#/path/:level)
+   ══════════════════════════════════════════════ */
+.lx-level-path-page-c { max-width: 860px; margin: 0 auto; padding: 0 0 48px; }
+
+/* Header */
+.lx-lp-header { margin-bottom: 16px; }
+.lx-lp-breadcrumb { margin-bottom: 10px; }
+.lx-lp-title-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.lx-lp-title {
+  font-size: 22px; font-weight: 800; color: var(--navy); margin: 0;
+}
+.lx-lp-purpose { font-size: 14px; color: var(--grey); line-height: 1.6; margin: 0; max-width: 640px; }
+
+/* Stats bar */
+.lx-lp-stats-bar {
+  display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px;
+}
+.lx-lp-stat {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 8px 16px; background: var(--white);
+  border-radius: var(--radius-sm); border: 1px solid var(--border);
+  font-size: 13px; min-width: 60px;
+  box-shadow: var(--shadow-sm);
+}
+.lx-lp-stat strong { font-size: 18px; font-weight: 800; color: var(--navy); }
+.lx-lp-stat span { font-size: 11px; color: var(--grey); }
+.lx-lp-stat-pct strong { color: var(--accent); }
+
+/* Outcomes */
+.lx-lp-outcomes {
+  background: var(--white); border-radius: var(--radius-lg);
+  border: 1px solid var(--border); padding: 16px 20px;
+  margin-bottom: 20px; box-shadow: var(--shadow-sm);
+}
+.lx-lp-outcomes-title {
+  font-size: 13px; font-weight: 700; color: var(--navy);
+  margin-bottom: 10px;
+}
+.lx-outcome-more { color: var(--grey); font-style: italic; }
+
+/* Units list */
+.lx-lp-units { display: flex; flex-direction: column; gap: 10px; }
+
+/* Individual unit */
+.lx-lp-unit {
+  background: var(--white); border-radius: var(--radius-lg);
+  border: 1.5px solid var(--border); overflow: hidden;
+  box-shadow: var(--shadow-sm); transition: border-color 0.15s;
+}
+.lx-lp-unit:focus-within { border-color: var(--accent-mid); }
+.lx-lp-unit-bridge { border-color: var(--amber); }
+.lx-lp-unit-bridge .lx-lp-unit-header { border-bottom-color: var(--amber-light); }
+
+/* Unit header accordion button */
+.lx-lp-unit-header {
+  width: 100%; padding: 14px 18px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: transparent; border: none; cursor: pointer;
+  font-family: var(--font); text-align: left;
+  transition: background 0.15s;
+  border-bottom: 1px solid transparent;
+}
+.lx-lp-unit-header:hover { background: var(--grey-bg); }
+.lx-lp-unit-header:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+.lx-lp-unit-header[aria-expanded="true"] { border-bottom-color: var(--border); background: var(--grey-bg); }
+
+.lx-lp-unit-header-left { display: flex; align-items: flex-start; gap: 10px; flex: 1; min-width: 0; }
+.lx-lp-unit-header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.lx-lp-unit-chevron {
+  color: var(--grey); font-size: 10px; flex-shrink: 0;
+  transition: transform 0.2s; display: inline-block; margin-top: 3px;
+}
+.lx-lp-unit-chevron.open { transform: rotate(90deg); color: var(--accent); }
+.lx-lp-unit-title { font-size: 15px; font-weight: 700; color: var(--navy); }
+.lx-lp-unit-desc { font-size: 12px; color: var(--grey); margin-top: 2px; line-height: 1.4; }
+.lx-lp-unit-count { font-size: 11px; color: var(--grey); white-space: nowrap; }
+.lx-lp-unit-progress { display: flex; align-items: center; }
+
+/* Unit body */
+.lx-lp-unit-body { padding: 4px 0; }
+.lx-lp-unit-hidden { display: none; }
+
+/* ── Lesson rows ── */
+.lx-lp-lesson-row {
+  width: 100%; display: flex; align-items: flex-start; gap: 10px;
+  padding: 11px 18px; border-bottom: 1px solid var(--border);
+  background: transparent; font-family: var(--font);
+  text-align: left; position: relative; flex-wrap: wrap;
+}
+.lx-lp-lesson-row:last-child { border-bottom: none; }
+
+/* Playable (READY/IN_PROGRESS/COMPLETED/REVIEW_DUE) */
+.lx-lp-lesson-playable {
+  cursor: pointer; border: none; transition: background 0.13s;
+}
+.lx-lp-lesson-playable:hover { background: var(--accent-light); }
+.lx-lp-lesson-playable:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* Locked */
+.lx-lp-lesson-locked { cursor: pointer; opacity: 0.75; }
+.lx-lp-lesson-locked:hover { background: #FFF5F5; }
+.lx-lp-lesson-locked:focus-visible { outline: 2px dashed #FDA4A4; outline-offset: -2px; }
+
+/* Planned / coming soon */
+.lx-lp-lesson-planned { cursor: default; opacity: 0.6; }
+
+/* Lesson row elements */
+.lx-lp-lesson-num {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--grey-bg); color: var(--grey);
+  font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-top: 1px;
+}
+.lx-lp-lesson-ring { flex-shrink: 0; margin-top: 1px; }
+.lx-lp-lesson-info { flex: 1; min-width: 0; }
+.lx-lp-lesson-title { font-size: 13px; font-weight: 700; color: var(--navy); line-height: 1.3; }
+.lx-lp-lesson-objective { font-size: 12px; color: var(--grey); margin-top: 2px; line-height: 1.4; }
+.lx-lp-lesson-meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 4px; }
+.lx-lp-lesson-family { font-size: 11px; color: var(--grey); }
+.lx-lp-lesson-time { font-size: 11px; color: var(--grey-light); }
+.lx-lp-lesson-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; }
+.lx-lp-lesson-arrow { font-size: 14px; color: var(--accent); font-weight: 700; }
+
+/* Lock / planned inline messages */
+.lx-lp-lock-msg, .lx-lp-planned-msg {
+  width: 100%; margin-top: 6px; padding: 7px 12px;
+  border-radius: var(--radius-sm); font-size: 12px; line-height: 1.5;
+  animation: fadeIn 0.2s ease;
+}
+.lx-lp-lock-msg { background: #FFF0F0; color: #9E1C1C; border: 1px solid #F7AAAA; }
+.lx-lp-planned-msg { background: #FFF8E1; color: #7C5E00; border: 1px solid #F9C945; }
+
+/* ── Responsive tweaks ── */
+@media (max-width: 640px) {
+  .lx-path-levels-c { grid-template-columns: 1fr; }
+  .lx-lp-lesson-row { flex-wrap: wrap; }
+  .lx-lp-lesson-right { width: 100%; justify-content: flex-end; }
+  .lx-lp-unit-header { padding: 12px 14px; }
+  .lx-lp-lesson-row { padding: 10px 14px; }
+}
+

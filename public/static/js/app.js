@@ -526,56 +526,74 @@
   }
 
   // ══════════════════════════════════════════════
-  // ── LEARNING PATH VIEW  (#/path) ──
+  // ── MODULE C: LEARNER PROGRESS HELPER ──
+  // Builds a map of lessonId → { completed, inProgress, reviewDue }
+  // from localStorage-backed persist layer.
   // ══════════════════════════════════════════════
-  function renderPathView() {
-    const curriculum = LX.curriculum;
-    const div = el('div', 'lx-path-page');
-    div.innerHTML = `
-    <div class="dashboard-header">
-      <button class="nav-back-btn" id="path-back-btn" style="margin-bottom:8px">← Dashboard</button>
-      <div class="dashboard-title">📚 Your Learning Path</div>
-      <div style="font-size:14px;color:var(--grey);margin-top:4px">Explore all levels and lessons — from A0 to C2.</div>
-    </div>
-    <div class="lx-path-levels">
-      ${curriculum.LEVEL_ORDER.map(code => {
-        const lvl = curriculum.levels[code];
-        const counts = curriculum.counts;
-        const published = (code === 'A1') ? 1 : 0;
-        const levelCounts = _getLevelCounts(code);
-        const isActive = code === 'A1';
-        return `
-        <button class="lx-path-level-card${isActive ? ' lx-path-level-active' : ''}" data-nav-path="/path/${code}">
-          <div class="lx-path-level-header">
-            <span class="cefr-badge cefr-${code.toLowerCase()}">${code}</span>
-            <span class="lx-path-level-title">${_levelDisplayName(code)}</span>
-            ${published > 0 ? `<span class="lx-path-published-dot" title="${published} published lesson">●</span>` : ''}
-          </div>
-          <div class="lx-path-level-desc">${esc(lvl ? lvl.levelPurpose || '' : '').slice(0, 100)}${(lvl && lvl.levelPurpose && lvl.levelPurpose.length > 100) ? '…' : ''}</div>
-          <div class="lx-path-level-meta">
-            <span>${levelCounts.total} lesson${levelCounts.total !== 1 ? 's' : ''}</span>
-            ${levelCounts.published > 0 ? `<span style="color:var(--green)">● ${levelCounts.published} published</span>` : ''}
-          </div>
-        </button>`;
-      }).join('')}
-    </div>
-    <div class="lx-path-note">
-      <div style="font-size:13px;color:var(--grey);text-align:center;padding:16px 0">
-        Full unit and lesson details coming in Module C. Click any level to explore.
-      </div>
-    </div>`;
-    return div;
+  function _buildLearnerProgress() {
+    const allAttempts = P.getAllAttempts();
+    const allReviews = P.getAllReviewEvents();
+    const lp = {};
+
+    // Mark completed and in-progress lessons
+    allAttempts.forEach(a => {
+      const lid = a.lesson_id || P.LESSON_ID;
+      if (!lp[lid]) lp[lid] = { completed: false, inProgress: false, reviewDue: false };
+      if (a.status === 'COMPLETED') lp[lid].completed = true;
+      if (a.status === 'IN_PROGRESS') lp[lid].inProgress = true;
+    });
+
+    // Mark review-due lessons (AVAILABLE review events = due)
+    allReviews.forEach(ev => {
+      if (ev.status === 'AVAILABLE') {
+        const lid = ev.lesson_id || P.LESSON_ID;
+        if (!lp[lid]) lp[lid] = { completed: false, inProgress: false, reviewDue: false };
+        lp[lid].reviewDue = true;
+      }
+    });
+
+    return lp;
   }
 
-  function _getLevelCounts(code) {
-    const lessons = LX.curriculum.getLessonsByLevel(code);
-    const published = lessons.filter(l => l.contentStatus === 'PUBLISHED').length;
-    return { total: lessons.length, published };
+  // ══════════════════════════════════════════════
+  // ── MODULE C: AVAILABILITY CHIP RENDERER ──
+  // ══════════════════════════════════════════════
+  function _availabilityChip(avail) {
+    const map = {
+      READY:       { cls: 'lx-chip-ready',        icon: '▶', label: 'Ready' },
+      IN_PROGRESS: { cls: 'lx-chip-inprogress',   icon: '▶', label: 'In progress' },
+      COMPLETED:   { cls: 'lx-chip-completed',     icon: '✓', label: 'Completed' },
+      REVIEW_DUE:  { cls: 'lx-chip-reviewdue',     icon: '⚡', label: 'Review due' },
+      LOCKED:      { cls: 'lx-chip-locked',        icon: '🔒', label: 'Locked' },
+      COMING_SOON: { cls: 'lx-chip-comingsoon',    icon: '🕐', label: 'Planned' },
+    };
+    const d = map[avail] || map.COMING_SOON;
+    return `<span class="lx-avail-chip ${d.cls}">${d.icon} ${d.label}</span>`;
   }
 
+  // ══════════════════════════════════════════════
+  // ── MODULE C: SVG MINI PROGRESS RING ──
+  // pct = 0–100; color = css var or hex
+  // ══════════════════════════════════════════════
+  function _miniRing(pct, color) {
+    const r = 8; const circ = 2 * Math.PI * r;
+    const dash = (pct / 100) * circ;
+    const gap = circ - dash;
+    return `<svg class="lx-ring" viewBox="0 0 22 22" aria-hidden="true">
+      <circle cx="11" cy="11" r="${r}" fill="none" stroke="var(--border)" stroke-width="2.5"/>
+      <circle cx="11" cy="11" r="${r}" fill="none" stroke="${color}" stroke-width="2.5"
+        stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}"
+        stroke-linecap="round"
+        transform="rotate(-90 11 11)"/>
+    </svg>`;
+  }
+
+  // ══════════════════════════════════════════════
+  // ── MODULE C: LEVEL DISPLAY DATA ──
+  // ══════════════════════════════════════════════
   function _levelDisplayName(code) {
     return {
-      A0: 'Foundation / Pre-A1',
+      A0: 'Foundation Bridge',
       A1: 'Beginner',
       A2: 'Elementary',
       B1: 'Intermediate',
@@ -585,50 +603,292 @@
     }[code] || code;
   }
 
+  function _levelEmoji(code) {
+    return { A0: '🌱', A1: '🔤', A2: '📝', B1: '💬', B2: '📖', C1: '🎓', C2: '🏆' }[code] || '📚';
+  }
+
+  function _getLevelCounts(code) {
+    const lessons = LX.curriculum.getLessonsByLevel(code);
+    const published = lessons.filter(l => l.contentStatus === 'PUBLISHED').length;
+    return { total: lessons.length, published };
+  }
+
   // ══════════════════════════════════════════════
-  // ── LEVEL PATH VIEW  (#/path/:level) ──
+  // ── LEARNING PATH VIEW  (#/path) ── MODULE C ──
+  // ══════════════════════════════════════════════
+  function renderPathView() {
+    const curriculum = LX.curriculum;
+    const lp = _buildLearnerProgress();
+    const div = el('div', 'lx-path-page');
+
+    div.innerHTML = `
+    <div class="dashboard-header">
+      <button class="nav-back-btn" id="path-back-btn" style="margin-bottom:8px">← Dashboard</button>
+      <div class="dashboard-title">📚 Your Learning Path</div>
+      <div style="font-size:14px;color:var(--grey);margin-top:4px">A0 Foundation to C2 Proficiency — explore levels, units, and lessons.</div>
+    </div>`;
+
+    const grid = el('div', 'lx-path-levels-c');
+
+    curriculum.LEVEL_ORDER.forEach(code => {
+      const lvl = curriculum.levels[code];
+      const levelCounts = _getLevelCounts(code);
+      const lvlPriority = (lvl && lvl.launchPriority) || 'P1';
+      const levelProgress = curriculum.getLevelProgress(code, lp);
+      const pct = levelProgress.pct;
+      const ringColor = pct === 100 ? 'var(--green)' : pct > 0 ? 'var(--accent)' : 'var(--border-dark)';
+
+      // Determine level availability state for styling
+      const hasPublished = levelCounts.published > 0;
+      const isActive = code === 'A1'; // only A1 has a published lesson
+      const hasProgress = pct > 0;
+
+      const priBadge = {
+        P0: `<span class="lx-priority-badge lx-pri-p0">P0 Launch</span>`,
+        P1: `<span class="lx-priority-badge lx-pri-p1">P1</span>`,
+        P2: `<span class="lx-priority-badge lx-pri-p2">P2</span>`,
+      }[lvlPriority] || '';
+
+      const publishedBadge = levelCounts.published > 0
+        ? `<span class="lx-path-published-dot" title="${levelCounts.published} published">● ${levelCounts.published} live</span>`
+        : `<span class="lx-path-planned-dot" title="All planned">🕐 Planned</span>`;
+
+      const statusBadge = hasProgress
+        ? (pct === 100 ? `<span class="lx-chip-completed" style="font-size:11px;padding:2px 8px;border-radius:20px">✓ Completed</span>`
+                      : `<span class="lx-chip-inprogress" style="font-size:11px;padding:2px 8px;border-radius:20px">▶ In progress</span>`)
+        : (hasPublished ? `<span class="lx-chip-ready" style="font-size:11px;padding:2px 8px;border-radius:20px">▶ Ready</span>`
+                        : `<span class="lx-chip-comingsoon" style="font-size:11px;padding:2px 8px;border-radius:20px">🕐 Coming soon</span>`);
+
+      const card = el('button', `lx-path-card-c${isActive ? ' lx-path-card-active' : ''}${!hasPublished ? ' lx-path-card-planned' : ''}`);
+      card.setAttribute('data-nav-path', `/path/${code}`);
+      card.setAttribute('aria-label', `${code} ${_levelDisplayName(code)} — ${levelCounts.total} lessons, ${levelCounts.published} published. ${pct}% complete.`);
+      card.innerHTML = `
+        <div class="lx-path-card-top">
+          <span class="cefr-badge cefr-${code.toLowerCase()}">${code}</span>
+          ${priBadge}
+          ${publishedBadge}
+          <span class="lx-path-card-arrow">→</span>
+        </div>
+        <div class="lx-path-card-title">${_levelEmoji(code)} ${_levelDisplayName(code)}</div>
+        <div class="lx-path-card-desc">${esc((lvl && lvl.levelPurpose) || '').slice(0, 90)}${(lvl && lvl.levelPurpose && lvl.levelPurpose.length > 90) ? '…' : ''}</div>
+        <div class="lx-path-card-footer">
+          <div class="lx-path-card-counts">
+            <span>${levelCounts.total} lessons</span>
+            <span>·</span>
+            <span>${_levelUnitCount(code)} units</span>
+          </div>
+          <div class="lx-path-card-progress" title="${pct}% complete">
+            ${_miniRing(pct, ringColor)}
+            <span class="lx-path-card-pct">${pct > 0 ? pct + '%' : ''}</span>
+          </div>
+        </div>
+        ${hasProgress ? `
+        <div class="lx-path-card-progbar">
+          <div class="lx-path-card-progfill" style="width:${pct}%;background:${ringColor}"></div>
+        </div>` : ''}`;
+      grid.appendChild(card);
+    });
+
+    div.appendChild(grid);
+
+    // Legend
+    const legend = el('div', 'lx-path-legend');
+    legend.innerHTML = `
+      <span class="lx-avail-chip lx-chip-ready" style="font-size:11px">▶ Ready</span>
+      <span class="lx-avail-chip lx-chip-inprogress" style="font-size:11px">▶ In progress</span>
+      <span class="lx-avail-chip lx-chip-completed" style="font-size:11px">✓ Completed</span>
+      <span class="lx-avail-chip lx-chip-reviewdue" style="font-size:11px">⚡ Review due</span>
+      <span class="lx-avail-chip lx-chip-locked" style="font-size:11px">🔒 Locked</span>
+      <span class="lx-avail-chip lx-chip-comingsoon" style="font-size:11px">🕐 Planned</span>`;
+    div.appendChild(legend);
+
+    return div;
+  }
+
+  function _levelUnitCount(code) {
+    const lvl = LX.curriculum.levels[code];
+    if (!lvl) return 0;
+    return (lvl.units || []).length + (lvl.foundationBridge ? 1 : 0);
+  }
+
+  // ══════════════════════════════════════════════
+  // ── LEVEL PATH VIEW  (#/path/:level) MODULE C ──
   // ══════════════════════════════════════════════
   function renderLevelPathView() {
     const code = (st.pathLevel || 'A1').toUpperCase();
     const curriculum = LX.curriculum;
     const lvl = curriculum.levels[code];
-    const lessons = curriculum.getLessonsByLevel(code);
-    const units = curriculum.getUnitsByLevel(code);
+    const lp = _buildLearnerProgress();
+    const path = curriculum.getPathByLevel(code);
+    const levelProgress = curriculum.getLevelProgress(code, lp);
 
-    const div = el('div', 'lx-level-path-page');
-    div.innerHTML = `
-    <div class="dashboard-header">
-      <button class="nav-back-btn" id="level-back-btn" style="margin-bottom:8px">← Learning Path</button>
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px">
-        <span class="cefr-badge cefr-${code.toLowerCase()}" style="font-size:14px;padding:5px 14px">${code}</span>
-        <div class="dashboard-title" style="margin:0">${_levelDisplayName(code)}</div>
+    const div = el('div', 'lx-level-path-page-c');
+
+    // ── Header ──
+    const header = el('div', 'lx-lp-header');
+    header.innerHTML = `
+      <div class="lx-lp-breadcrumb">
+        <button class="nav-back-btn" id="level-back-btn">← Learning Path</button>
       </div>
-      ${lvl ? `<div style="font-size:14px;color:var(--grey);margin-top:4px;max-width:600px">${esc(lvl.levelPurpose || '').slice(0, 180)}${lvl.levelPurpose && lvl.levelPurpose.length > 180 ? '…' : ''}</div>` : ''}
-    </div>
+      <div class="lx-lp-title-row">
+        <span class="cefr-badge cefr-${code.toLowerCase()}" style="font-size:14px;padding:5px 14px">${code}</span>
+        <h1 class="lx-lp-title">${_levelEmoji(code)} ${_levelDisplayName(code)}</h1>
+        <span class="lx-priority-badge lx-pri-${(lvl && lvl.launchPriority || 'P1').toLowerCase()}">${lvl && lvl.launchPriority || 'P1'} ${lvl && lvl.launchPriority === 'P0' ? 'Launch' : ''}</span>
+      </div>
+      ${lvl ? `<p class="lx-lp-purpose">${esc(lvl.levelPurpose || '').slice(0, 220)}${lvl.levelPurpose && lvl.levelPurpose.length > 220 ? '…' : ''}</p>` : ''}`;
+    div.appendChild(header);
 
-    <div class="lx-level-stats">
-      <div class="lx-level-stat-pill"><strong>${lessons.length}</strong> lessons</div>
-      <div class="lx-level-stat-pill"><strong>${lessons.filter(l => l.contentStatus === 'PUBLISHED').length}</strong> published</div>
-      <div class="lx-level-stat-pill"><strong>${(units || []).length}</strong> units</div>
-    </div>
+    // ── Stats bar ──
+    const statsBar = el('div', 'lx-lp-stats-bar');
+    statsBar.innerHTML = `
+      <div class="lx-lp-stat"><strong>${levelProgress.total}</strong><span>lessons</span></div>
+      <div class="lx-lp-stat"><strong>${levelProgress.published}</strong><span>published</span></div>
+      <div class="lx-lp-stat"><strong>${levelProgress.planned}</strong><span>planned</span></div>
+      <div class="lx-lp-stat"><strong>${(path ? path.segments.length : 0)}</strong><span>units</span></div>
+      ${levelProgress.pct > 0 ? `<div class="lx-lp-stat lx-lp-stat-pct"><strong style="color:var(--accent)">${levelProgress.pct}%</strong><span>complete</span></div>` : ''}`;
+    div.appendChild(statsBar);
 
-    ${lvl && lvl.endOfLevelOutcomes && lvl.endOfLevelOutcomes.length ? `
-    <div class="lx-level-outcomes">
-      <div class="sidebar-card-title" style="margin-bottom:10px">🎯 What you will be able to do at ${code} level</div>
-      <ul class="lx-outcome-list">
-        ${lvl.endOfLevelOutcomes.slice(0, 6).map(o => `<li>${esc(o)}</li>`).join('')}
-        ${lvl.endOfLevelOutcomes.length > 6 ? `<li style="color:var(--grey)">… and ${lvl.endOfLevelOutcomes.length - 6} more</li>` : ''}
-      </ul>
-    </div>` : ''}
+    // ── End-of-level outcomes ──
+    if (lvl && lvl.endOfLevelOutcomes && lvl.endOfLevelOutcomes.length) {
+      const outBox = el('div', 'lx-lp-outcomes');
+      outBox.innerHTML = `<div class="lx-lp-outcomes-title">🎯 Level outcomes — what you will be able to do:</div>
+        <ul class="lx-outcome-list">
+          ${lvl.endOfLevelOutcomes.slice(0, 5).map(o => `<li>${esc(o)}</li>`).join('')}
+          ${lvl.endOfLevelOutcomes.length > 5 ? `<li class="lx-outcome-more">… and ${lvl.endOfLevelOutcomes.length - 5} more</li>` : ''}
+        </ul>`;
+      div.appendChild(outBox);
+    }
 
-    <div class="lx-level-lessons-header">
-      <div class="sidebar-card-title">📖 Lessons at ${code} level</div>
-      <div style="font-size:12px;color:var(--grey)">Full unit view coming in Module C</div>
-    </div>
-    <div class="lx-level-lesson-list">
-      ${lessons.slice(0, 20).map(l => _renderMiniLessonRow(l)).join('')}
-      ${lessons.length > 20 ? `<div style="text-align:center;padding:12px;font-size:13px;color:var(--grey)">…and ${lessons.length - 20} more lessons</div>` : ''}
-    </div>`;
+    // ── Units / segments ──
+    const unitsWrap = el('div', 'lx-lp-units');
+
+    if (!path || !path.segments || path.segments.length === 0) {
+      unitsWrap.innerHTML = `<div class="empty-state"><div class="empty-state-text">No units available for this level yet.</div></div>`;
+    } else {
+      path.segments.forEach((seg, segIdx) => {
+        const unitData = seg.data;
+        const isBridge = seg.type === 'bridge';
+        const unitCode = unitData.code;
+        const unitLessons = unitData.lessons || [];
+
+        // ── Unit progress ──
+        const unitProg = curriculum.getUnitProgress(unitCode, lp);
+        const unitRingColor = unitProg.pct === 100 ? 'var(--green)' : unitProg.pct > 0 ? 'var(--accent)' : 'var(--border-dark)';
+
+        // First unit starts expanded; others collapsed unless expanded in state
+        if (st.unitExpanded[unitCode] === undefined) {
+          st.unitExpanded[unitCode] = (segIdx === 0);
+        }
+        const isExpanded = st.unitExpanded[unitCode];
+
+        const unitEl = el('div', `lx-lp-unit${isBridge ? ' lx-lp-unit-bridge' : ''}`);
+        unitEl.dataset.unitCode = unitCode;
+
+        // ── Unit header (accordion trigger) ──
+        const priorityLabel = unitData.launchPriority ? unitData.launchPriority : (lvl && lvl.launchPriority) || 'P1';
+        const priBadge = `<span class="lx-priority-badge lx-pri-${priorityLabel.toLowerCase()}">${priorityLabel}${priorityLabel === 'P0' ? ' Launch' : ''}</span>`;
+
+        const unitHeader = el('button', 'lx-lp-unit-header');
+        unitHeader.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+        unitHeader.setAttribute('aria-controls', `unit-body-${unitCode}`);
+        unitHeader.dataset.unitToggle = unitCode;
+        unitHeader.innerHTML = `
+          <div class="lx-lp-unit-header-left">
+            <span class="lx-lp-unit-chevron${isExpanded ? ' open' : ''}">▶</span>
+            <div>
+              <div class="lx-lp-unit-title">${esc(unitData.title)}</div>
+              <div class="lx-lp-unit-desc">${esc(unitData.description || '')}</div>
+            </div>
+          </div>
+          <div class="lx-lp-unit-header-right">
+            ${priBadge}
+            <span class="lx-lp-unit-count">${unitLessons.length} lesson${unitLessons.length !== 1 ? 's' : ''}</span>
+            <div class="lx-lp-unit-progress" title="${unitProg.pct}% complete">
+              ${_miniRing(unitProg.pct, unitRingColor)}
+            </div>
+          </div>`;
+
+        unitEl.appendChild(unitHeader);
+
+        // ── Unit body (lessons list) ──
+        const unitBody = el('div', `lx-lp-unit-body${isExpanded ? '' : ' lx-lp-unit-hidden'}`);
+        unitBody.id = `unit-body-${unitCode}`;
+        unitBody.setAttribute('role', 'region');
+
+        unitLessons.forEach((lesson, li) => {
+          const avail = curriculum.getLessonAvailability(lesson.id, lp);
+          const fam = (LX.scenarioFamilies || []).find(f => f.id === lesson.scenarioFamily);
+          const famLabel = fam ? fam.emoji + ' ' + fam.name : '';
+
+          // Lesson-level progress ring
+          const lessonPct = lp[lesson.id]
+            ? (lp[lesson.id].completed ? 100 : lp[lesson.id].inProgress ? 50 : 0)
+            : 0;
+          const lessonRingColor = lessonPct === 100 ? 'var(--green)' : lessonPct > 0 ? 'var(--accent)' : 'var(--border)';
+
+          const isPublished = lesson.contentStatus === 'PUBLISHED';
+          const isPlayable = isPublished && (avail === 'READY' || avail === 'IN_PROGRESS' || avail === 'COMPLETED' || avail === 'REVIEW_DUE');
+          const isLocked = avail === 'LOCKED';
+          const isComingSoon = avail === 'COMING_SOON';
+
+          // Get prereq title for locked tooltip
+          let prereqTitle = '';
+          if (isLocked) {
+            const prereqs = curriculum.getPrerequisites(lesson.id);
+            if (prereqs.length > 0) {
+              const prereqLesson = curriculum.getLessonById(prereqs[0]);
+              prereqTitle = prereqLesson ? prereqLesson.title : prereqs[0];
+            }
+          }
+
+          let rowEl;
+          if (isPlayable) {
+            rowEl = el('button', 'lx-lp-lesson-row lx-lp-lesson-playable');
+            rowEl.dataset.lpLesson = lesson.id;
+            rowEl.dataset.lessonAvail = avail;
+            rowEl.setAttribute('aria-label', `${esc(lesson.title)} — ${avail.replace(/_/g, ' ').toLowerCase()}. ${lesson.estimatedMinutes} min.`);
+          } else if (isLocked) {
+            rowEl = el('div', 'lx-lp-lesson-row lx-lp-lesson-locked');
+            rowEl.setAttribute('tabindex', '0');
+            rowEl.setAttribute('role', 'button');
+            rowEl.dataset.lessonLocked = lesson.id;
+            rowEl.dataset.prereqTitle = prereqTitle;
+            rowEl.setAttribute('aria-label', `${lesson.title} — locked. Complete "${prereqTitle}" first.`);
+          } else {
+            // COMING_SOON
+            rowEl = el('div', 'lx-lp-lesson-row lx-lp-lesson-planned');
+            rowEl.setAttribute('role', 'listitem');
+            rowEl.setAttribute('aria-label', `${lesson.title} — planned, not yet available.`);
+          }
+
+          rowEl.innerHTML = `
+            <div class="lx-lp-lesson-num">${li + 1}</div>
+            <div class="lx-lp-lesson-ring">${_miniRing(lessonPct, lessonRingColor)}</div>
+            <div class="lx-lp-lesson-info">
+              <div class="lx-lp-lesson-title">${esc(lesson.title)}</div>
+              <div class="lx-lp-lesson-objective">${esc(lesson.objective)}</div>
+              <div class="lx-lp-lesson-meta">
+                ${famLabel ? `<span class="lx-lp-lesson-family">${famLabel}</span>` : ''}
+                <span class="lx-lp-lesson-time">⏱ ${lesson.estimatedMinutes} min</span>
+                ${lesson.launchPriority ? `<span class="lx-priority-badge lx-pri-${lesson.launchPriority.toLowerCase()}">${lesson.launchPriority}</span>` : ''}
+              </div>
+            </div>
+            <div class="lx-lp-lesson-right">
+              ${_availabilityChip(avail)}
+              ${isPlayable ? `<span class="lx-lp-lesson-arrow">→</span>` : ''}
+            </div>
+            ${isLocked ? `<div class="lx-lp-lock-msg" id="lock-msg-${lesson.id}" role="status" aria-live="polite" style="display:none">🔒 Complete "<strong>${esc(prereqTitle)}</strong>" first to unlock this lesson.</div>` : ''}
+            ${isComingSoon ? `<div class="lx-lp-planned-msg" id="planned-msg-${lesson.id}" role="status" aria-live="polite" style="display:none">🕐 This lesson is planned and will be available when it is created and published.</div>` : ''}`;
+
+          unitBody.appendChild(rowEl);
+        });
+
+        unitEl.appendChild(unitBody);
+        unitsWrap.appendChild(unitEl);
+      });
+    }
+
+    div.appendChild(unitsWrap);
     return div;
   }
 
@@ -2864,19 +3124,95 @@
     const reviewGoAttemptsBtn = document.getElementById('review-go-attempts-btn');
     if (reviewGoAttemptsBtn) reviewGoAttemptsBtn.addEventListener('click', () => navigate('/attempts'));
 
-    // ── PATH VIEW buttons ──
+    // ── PATH VIEW buttons (Module C: .lx-path-card-c) ──
     const pathBackBtn = document.getElementById('path-back-btn');
     if (pathBackBtn) pathBackBtn.addEventListener('click', () => navigate(''));
 
+    // Module B legacy path level cards (kept for backward compat)
     $$('.lx-path-level-card').forEach(card => {
-      card.addEventListener('click', () => {
-        navigate(card.dataset.navPath);
+      card.addEventListener('click', () => navigate(card.dataset.navPath));
+      card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(card.dataset.navPath); } });
+    });
+
+    // Module C path level cards
+    $$('.lx-path-card-c').forEach(card => {
+      const action = () => { if (card.dataset.navPath) navigate(card.dataset.navPath); };
+      card.addEventListener('click', action);
+      card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); action(); } });
+    });
+
+    // ── LEVEL PATH VIEW buttons (Module C) ──
+    const levelBackBtn = document.getElementById('level-back-btn');
+    if (levelBackBtn) levelBackBtn.addEventListener('click', () => navigate('/path'));
+
+    // ── Unit accordion toggles ──
+    $$('[data-unit-toggle]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const unitCode = btn.dataset.unitToggle;
+        st.unitExpanded[unitCode] = !st.unitExpanded[unitCode];
+        render();
+      });
+      btn.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          const unitCode = btn.dataset.unitToggle;
+          st.unitExpanded[unitCode] = !st.unitExpanded[unitCode];
+          render();
+        }
       });
     });
 
-    // ── LEVEL PATH VIEW buttons ──
-    const levelBackBtn = document.getElementById('level-back-btn');
-    if (levelBackBtn) levelBackBtn.addEventListener('click', () => navigate('/path'));
+    // ── Lesson row: playable lessons (published + available) ──
+    $$('.lx-lp-lesson-playable').forEach(row => {
+      const action = () => {
+        const lid = row.dataset.lpLesson;
+        const avail = row.dataset.lessonAvail;
+        if (!lid) return;
+        if (lid === 'A1-BE-LOST-PROPERTY-001') {
+          if (avail === 'COMPLETED' || avail === 'REVIEW_DUE') {
+            navigate('/lesson/' + lid + '/review');
+          } else {
+            _startOrResumeLesson(false);
+          }
+        } else {
+          _showComingSoonModal('This lesson is published but the full lesson body is not yet available.');
+        }
+      };
+      row.addEventListener('click', action);
+      row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); action(); } });
+    });
+
+    // ── Lesson row: locked lessons — show prerequisite explanation ──
+    $$('.lx-lp-lesson-locked').forEach(row => {
+      const showLock = () => {
+        const lid = row.dataset.lessonLocked;
+        const prereq = row.dataset.prereqTitle || 'the previous lesson';
+        // hide all other open messages first
+        $$('.lx-lp-lock-msg').forEach(m => { m.style.display = 'none'; });
+        $$('.lx-lp-planned-msg').forEach(m => { m.style.display = 'none'; });
+        const msg = document.getElementById('lock-msg-' + lid);
+        if (msg) {
+          const isVisible = msg.style.display === 'block';
+          msg.style.display = isVisible ? 'none' : 'block';
+        }
+      };
+      row.addEventListener('click', showLock);
+      row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showLock(); } });
+    });
+
+    // ── Lesson row: planned lessons — show planned message ──
+    $$('.lx-lp-lesson-planned').forEach(row => {
+      const showPlanned = () => {
+        const msg = row.querySelector('.lx-lp-planned-msg');
+        if (msg) {
+          $$('.lx-lp-lock-msg').forEach(m => { m.style.display = 'none'; });
+          $$('.lx-lp-planned-msg').forEach(m => { if (m !== msg) m.style.display = 'none'; });
+          msg.style.display = msg.style.display === 'block' ? 'none' : 'block';
+        }
+      };
+      row.addEventListener('click', showPlanned);
+      row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showPlanned(); } });
+    });
 
     // ── SCENARIO VIEW buttons ──
     const scenarioBackBtn = document.getElementById('scenario-back-btn');

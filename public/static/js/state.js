@@ -42,6 +42,10 @@
     pathLevel: null,            // level code for #/path/:level
     scenarioFamily: null,       // scenario family id for #/scenario/:family
 
+    // Phase 2 Module C — Learning Path state
+    // Map of unitCode → boolean (is the unit accordion expanded?)
+    unitExpanded: {},           // persists across renders within a session
+
     // Compare mode
     compareAttemptIds: [null, null],
 
