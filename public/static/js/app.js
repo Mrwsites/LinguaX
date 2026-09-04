@@ -24,41 +24,72 @@
   // ── ROUTER ──
   function getRoute() {
     const hash = location.hash.replace('#', '') || '';
+    if (hash.startsWith('/lesson/') && hash.includes('/review')) return 'lesson_review';
     if (hash.startsWith('/lesson')) return 'lesson';
     if (hash.startsWith('/teacher')) return 'teacher';
     if (hash.startsWith('/admin')) return 'admin';
     if (hash.startsWith('/attempts/compare')) return 'attempt_compare';
     if (hash.startsWith('/attempts/')) return 'attempt_detail';
     if (hash.startsWith('/attempts')) return 'attempts';
+    if (hash.startsWith('/path/')) return 'level_path';
+    if (hash.startsWith('/path')) return 'path';
+    if (hash.startsWith('/scenario/')) return 'scenario';
     return 'dashboard';
   }
 
   function navigate(route) {
     location.hash = route;
     const r = route.replace('#', '');
-    if (r.startsWith('/lesson')) st.currentView = 'lesson';
-    else if (r.startsWith('/teacher')) st.currentView = 'teacher';
-    else if (r.startsWith('/admin')) st.currentView = 'admin';
-    else if (r.startsWith('/attempts/compare')) st.currentView = 'attempt_compare';
-    else if (r.startsWith('/attempts/')) {
-      // e.g. /attempts/attempt-id-here
+    if (r.startsWith('/lesson/') && r.includes('/review')) {
+      st.reviewLessonId = r.replace('/lesson/', '').replace('/review', '');
+      st.currentView = 'lesson_review';
+    } else if (r.startsWith('/lesson')) {
+      st.currentView = 'lesson';
+    } else if (r.startsWith('/teacher')) {
+      st.currentView = 'teacher';
+    } else if (r.startsWith('/admin')) {
+      st.currentView = 'admin';
+    } else if (r.startsWith('/attempts/compare')) {
+      st.currentView = 'attempt_compare';
+    } else if (r.startsWith('/attempts/')) {
       st.readOnlyAttemptId = r.replace('/attempts/', '');
       st.currentView = 'attempt_detail';
+    } else if (r.startsWith('/attempts')) {
+      st.currentView = 'attempts';
+    } else if (r.startsWith('/path/')) {
+      st.pathLevel = r.replace('/path/', '');
+      st.currentView = 'level_path';
+    } else if (r.startsWith('/path')) {
+      st.currentView = 'path';
+    } else if (r.startsWith('/scenario/')) {
+      st.scenarioFamily = r.replace('/scenario/', '');
+      st.currentView = 'scenario';
+    } else {
+      st.currentView = 'dashboard';
     }
-    else if (r.startsWith('/attempts')) st.currentView = 'attempts';
-    else st.currentView = 'dashboard';
     render();
   }
 
   window.addEventListener('hashchange', () => {
     const route = location.hash.replace('#', '') || '';
-    if (route.startsWith('/attempts/compare')) {
+    if (route.startsWith('/lesson/') && route.includes('/review')) {
+      st.reviewLessonId = route.replace('/lesson/', '').replace('/review', '');
+      st.currentView = 'lesson_review';
+    } else if (route.startsWith('/attempts/compare')) {
       st.currentView = 'attempt_compare';
     } else if (route.startsWith('/attempts/')) {
       st.readOnlyAttemptId = route.replace('/attempts/', '');
       st.currentView = 'attempt_detail';
     } else if (route.startsWith('/attempts')) {
       st.currentView = 'attempts';
+    } else if (route.startsWith('/path/')) {
+      st.pathLevel = route.replace('/path/', '');
+      st.currentView = 'level_path';
+    } else if (route.startsWith('/path')) {
+      st.currentView = 'path';
+    } else if (route.startsWith('/scenario/')) {
+      st.scenarioFamily = route.replace('/scenario/', '');
+      st.currentView = 'scenario';
     } else {
       st.currentView = getRoute();
     }
@@ -78,11 +109,15 @@
     content.appendChild(renderRoleSwitcher());
 
     if (st.currentView === 'lesson')           content.appendChild(renderLessonView());
+    else if (st.currentView === 'lesson_review') content.appendChild(renderLessonReviewView());
     else if (st.currentView === 'teacher')     content.appendChild(renderTeacherView());
     else if (st.currentView === 'admin')       content.appendChild(renderAdminView());
     else if (st.currentView === 'attempts')    content.appendChild(renderAttemptsPage());
     else if (st.currentView === 'attempt_detail')  content.appendChild(renderAttemptDetailPage());
     else if (st.currentView === 'attempt_compare') content.appendChild(renderAttemptComparePage());
+    else if (st.currentView === 'path')        content.appendChild(renderPathView());
+    else if (st.currentView === 'level_path')  content.appendChild(renderLevelPathView());
+    else if (st.currentView === 'scenario')    content.appendChild(renderScenarioView());
     else content.appendChild(renderDashboard());
 
     main.appendChild(content);
@@ -112,6 +147,7 @@
       </a>
       <div class="flex items-center gap-12">
         <span class="nav-role-badge ${roleClass}">${roleName}</span>
+        ${st.currentView === 'dashboard' && st.currentRole === 'learner' ? `<a href="#/path" class="nav-path-link" id="nav-path-link">📚 Learning Path</a>` : ''}
         <div class="nav-avatar">${p.avatar}</div>
         <span style="font-size:14px;font-weight:600;color:var(--navy)">${p.name}</span>
         ${showBack ? `<button class="nav-back-btn" id="nav-back-btn">← Dashboard</button>` : ''}
@@ -150,6 +186,25 @@
     return div;
   }
 
+  // ── SCENARIO FAMILY HELPERS ──
+  function _scenarioLabel(familyId) {
+    const fam = (LX.scenarioFamilies || []).find(f => f.id === familyId);
+    return fam ? (fam.emoji + ' ' + fam.name) : familyId;
+  }
+
+  // Make a clickable CEFR badge button
+  function _cefrBadgeBtn(level) {
+    const cls = 'cefr-badge cefr-' + level.toLowerCase() + ' lx-badge-btn';
+    return `<button class="${cls}" data-nav-path="/path/${level}" aria-label="View ${level} learning path" title="View ${level} learning path">${level}</button>`;
+  }
+
+  // Make a clickable scenario badge button
+  function _scenarioBadgeBtn(familyId) {
+    const fam = (LX.scenarioFamilies || []).find(f => f.id === familyId);
+    const label = fam ? (fam.emoji + ' ' + fam.name) : familyId;
+    return `<button class="lesson-family lx-badge-btn" data-nav-scenario="${familyId}" aria-label="View ${fam ? fam.name : familyId} lessons" title="Browse ${fam ? fam.name : familyId} lessons">${label}</button>`;
+  }
+
   function renderLessonCards() {
     const lesson = LX.lesson_A1_001;
     const activeAttempt = P.getActiveAttempt();
@@ -161,28 +216,35 @@
     col.innerHTML = `<div class="section-title-sm">📚 Your Lessons</div>`;
 
     // ── Lesson card based on state ──
-    const card = el('div', 'lesson-card-lg');
+    // We use a wrapper div with a data attribute to mark the primary click action,
+    // while inner buttons use stopPropagation to avoid double-firing.
+    const lessonId = lesson.id;
 
     if (activeAttempt) {
       // IN-PROGRESS state
       const prog = LX.getInstructionalProgress();
       const stageLabel = LX.STAGES[activeAttempt.current_stage_index]?.label || 'Overview';
+      const card = el('div', 'lesson-card-lg lx-card-interactive');
+      card.setAttribute('role', 'article');
+      card.setAttribute('tabindex', '0');
+      card.setAttribute('aria-label', lesson.title + ' — In progress. Press Enter to continue.');
+      card.dataset.cardAction = 'continue';
       card.innerHTML = `
       <div class="lesson-card-accent-bar" style="background:var(--accent)"></div>
       <div class="lesson-card-body">
         <div class="lesson-card-meta">
-          <span class="cefr-badge cefr-a1">A1</span>
-          <span class="lesson-family">🏛️ Community & Public Places</span>
+          ${_cefrBadgeBtn('A1')}
+          ${_scenarioBadgeBtn('community_public')}
           <span class="lesson-duration">⏱ 25 min</span>
           <span class="lesson-duration">· Attempt ${activeAttempt.attempt_number}</span>
         </div>
-        <div class="lesson-title">${lesson.title}</div>
-        <div class="lesson-objective">${lesson.objective}</div>
+        <button class="lesson-title-link lx-card-title-btn" id="lesson-title-btn" data-card-action="continue" aria-label="Continue: ${esc(lesson.title)}">${esc(lesson.title)}</button>
+        <div class="lesson-objective">${esc(lesson.objective)}</div>
 
         <div style="background:var(--accent-light);border-radius:8px;padding:12px 14px;margin:12px 0;border:1px solid var(--accent)">
-          <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:4px">▶ In progress</div>
-          <div style="font-size:13px;color:var(--navy)">Last saved: ${P.formatDateTime(activeAttempt.last_saved_at)}</div>
-          <div style="font-size:13px;color:var(--navy)">Current stage: ${stageLabel}</div>
+          <button class="lx-inline-status-btn status-pill status-pill-inprogress" data-card-action="continue" id="inprogress-status-btn" aria-label="Continue in-progress lesson">▶ In progress</button>
+          <div style="font-size:13px;color:var(--navy);margin-top:4px">Last saved: ${P.formatDateTime(activeAttempt.last_saved_at)}</div>
+          <div style="font-size:13px;color:var(--navy)">Current stage: ${esc(stageLabel)}</div>
         </div>
 
         <div class="lesson-progress-wrap">
@@ -196,11 +258,12 @@
         </div>
 
         <div class="lesson-card-footer-lg" style="flex-wrap:wrap;gap:8px">
-          <span class="status-pill status-pill-inprogress">▶ In progress</span>
-          <button class="btn-continue" id="continue-lesson-btn">▶ Continue Lesson</button>
+          <button class="btn-continue lx-card-primary-btn" id="continue-lesson-btn">▶ Continue Lesson</button>
+          <button class="lx-card-arrow-btn" id="lesson-arrow-btn" data-card-action="continue" aria-label="Continue lesson">→</button>
           ${completedCount > 0 ? `<button class="btn-outline-sm" id="view-attempts-btn-card">View all attempts</button>` : ''}
         </div>
       </div>`;
+      col.appendChild(card);
 
     } else if (latestCompleted) {
       // COMPLETED state
@@ -210,72 +273,114 @@
       const score = latestCompleted.total_score;
       const scenarioTitle = latestCompleted.attempt_summary_json?.transferScenarioTitle || '—';
 
+      const card = el('div', 'lesson-card-lg lx-card-interactive');
+      card.setAttribute('role', 'article');
+      card.setAttribute('tabindex', '0');
+      card.setAttribute('aria-label', lesson.title + ' — Completed. Press Enter to review.');
+      card.dataset.cardAction = 'review';
+      card.dataset.lessonId = lessonId;
       card.innerHTML = `
       <div class="lesson-card-accent-bar" style="background:var(--green)"></div>
       <div class="lesson-card-body">
         <div class="lesson-card-meta">
-          <span class="cefr-badge cefr-a1">A1</span>
-          <span class="lesson-family">🏛️ Community & Public Places</span>
+          ${_cefrBadgeBtn('A1')}
+          ${_scenarioBadgeBtn('community_public')}
           <span class="lesson-duration">⏱ 25 min</span>
         </div>
-        <div class="lesson-title">${lesson.title}</div>
-        <div class="lesson-objective">${lesson.objective}</div>
+        <button class="lesson-title-link lx-card-title-btn" data-card-action="review" data-lesson-id="${lessonId}" aria-label="Review: ${esc(lesson.title)}">${esc(lesson.title)}</button>
+        <div class="lesson-objective">${esc(lesson.objective)}</div>
 
         <div style="background:var(--green-light);border-radius:8px;padding:12px 14px;margin:12px 0;border:1px solid var(--green)">
-          <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px">✓ Completed · Attempt ${latestCompleted.attempt_number}</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <button class="lx-inline-status-btn status-pill status-pill-completed" data-card-action="review" data-lesson-id="${lessonId}" id="completed-status-btn" aria-label="Review completed lesson">✓ Completed · Attempt ${latestCompleted.attempt_number}</button>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">
             <div style="font-size:13px;color:var(--navy)">Latest score: <strong>${score !== null ? score + '/16' : '—'}</strong></div>
             <div style="font-size:13px;color:${bandColor};font-weight:700">${bandLabel}</div>
             <div style="font-size:12px;color:var(--grey)">Completed: ${P.formatDate(latestCompleted.completed_at)}</div>
-            <div style="font-size:12px;color:var(--grey)">Scenario: ${scenarioTitle}</div>
+            <div style="font-size:12px;color:var(--grey)">Scenario: ${esc(scenarioTitle)}</div>
           </div>
         </div>
 
         <div class="lesson-card-footer-lg" style="flex-wrap:wrap;gap:8px">
-          <span class="status-pill status-pill-completed">✓ Completed</span>
-          <button class="btn-review" id="new-attempt-btn">⊕ New Attempt</button>
+          <button class="btn-review lx-card-primary-btn" id="review-lesson-btn" data-lesson-id="${lessonId}">📖 Review Lesson</button>
+          <button class="lx-card-arrow-btn" data-card-action="review" data-lesson-id="${lessonId}" aria-label="Review lesson">→</button>
+          <button class="btn-outline-sm" id="new-attempt-btn">⊕ New Attempt</button>
           <button class="btn-outline-sm" id="view-attempts-btn-card">Lesson History</button>
         </div>
       </div>`;
+      col.appendChild(card);
 
     } else {
-      // NOT STARTED state
+      // NOT STARTED / READY state
+      const card = el('div', 'lesson-card-lg lx-card-interactive');
+      card.setAttribute('role', 'article');
+      card.setAttribute('tabindex', '0');
+      card.setAttribute('aria-label', lesson.title + ' — Ready to start. Press Enter to begin.');
+      card.dataset.cardAction = 'start';
       card.innerHTML = `
       <div class="lesson-card-accent-bar" style="background:var(--accent)"></div>
       <div class="lesson-card-body">
         <div class="lesson-card-meta">
-          <span class="cefr-badge cefr-a1">A1</span>
-          <span class="lesson-family">🏛️ Community & Public Places</span>
+          ${_cefrBadgeBtn('A1')}
+          ${_scenarioBadgeBtn('community_public')}
           <span class="lesson-duration">⏱ 25 min</span>
           <span class="lesson-duration">· ${P.INSTRUCTIONAL_STAGE_COUNT} stages</span>
         </div>
-        <div class="lesson-title">${lesson.title}</div>
-        <div class="lesson-objective">${lesson.objective}</div>
+        <button class="lesson-title-link lx-card-title-btn" data-card-action="start" aria-label="Start: ${esc(lesson.title)}">${esc(lesson.title)}</button>
+        <div class="lesson-objective">${esc(lesson.objective)}</div>
         <div class="lesson-card-footer-lg">
           <span class="status-pill status-pill-notstarted">● Not started</span>
-          <button class="btn-start" id="start-lesson-btn">→ Start Lesson</button>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button class="btn-start lx-card-primary-btn" id="start-lesson-btn">→ Start Lesson</button>
+            <button class="lx-card-arrow-btn" data-card-action="start" aria-label="Start lesson">→</button>
+          </div>
         </div>
       </div>`;
+      col.appendChild(card);
     }
 
-    col.appendChild(card);
-
-    // Coming soon card
-    const comingSoon = el('div', 'lesson-card-lg', `
+    // Coming soon / PLANNED card — non-interactive, shows explanation on attempt
+    const comingSoon = el('div', 'lesson-card-lg lx-card-planned');
+    comingSoon.setAttribute('role', 'article');
+    comingSoon.setAttribute('tabindex', '0');
+    comingSoon.setAttribute('aria-label', 'Hotel Check-In — Planned lesson, not yet available');
+    comingSoon.innerHTML = `
     <div class="lesson-card-accent-bar" style="background:var(--border)"></div>
-    <div class="lesson-card-body" style="opacity:0.5">
-      <div class="lesson-card-meta">
+    <div class="lesson-card-body">
+      <div class="lesson-card-meta" style="opacity:0.55">
         <span class="cefr-badge cefr-a2">A2</span>
-        <span class="lesson-family">🏨 Travel & Transport</span>
+        <span class="lesson-family">✈️ Travel &amp; Transport</span>
         <span class="lesson-duration">⏱ 30 min</span>
       </div>
-      <div class="lesson-title">Hotel Check-In: My Room Has a Problem</div>
-      <div class="lesson-objective">I can describe a problem with my room and ask for help from a receptionist.</div>
-      <div class="lesson-card-footer-lg">
-        <span class="status-pill status-pill-locked">🔒 Coming soon</span>
+      <div class="lesson-title" style="opacity:0.55">Hotel Check-In: My Room Has a Problem</div>
+      <div class="lesson-objective" style="opacity:0.55">I can describe a problem with my room and ask for help from a receptionist.</div>
+      <div class="lesson-card-footer-lg" style="border-top:1px solid var(--border)">
+        <span class="status-pill status-pill-locked" style="opacity:0.7">🕐 Planned — Coming soon</span>
       </div>
-    </div>`);
+      <div class="lx-planned-tooltip" id="planned-tooltip-hotel" aria-live="polite" role="status" style="display:none"></div>
+    </div>`;
     col.appendChild(comingSoon);
+
+    // Locked card — shows prerequisite explanation on click
+    const lockedCard = el('div', 'lesson-card-lg lx-card-locked');
+    lockedCard.setAttribute('role', 'article');
+    lockedCard.setAttribute('tabindex', '0');
+    lockedCard.setAttribute('aria-label', 'Is It …? Yes/No Questions — Locked lesson');
+    lockedCard.innerHTML = `
+    <div class="lesson-card-accent-bar" style="background:var(--border)"></div>
+    <div class="lesson-card-body">
+      <div class="lesson-card-meta" style="opacity:0.5">
+        <span class="cefr-badge cefr-a1">A1</span>
+        <span class="lesson-family">🏛️ Community &amp; Public Places</span>
+        <span class="lesson-duration">⏱ 25 min</span>
+      </div>
+      <div class="lesson-title" style="opacity:0.5">Is It …? — Yes/No Questions with "to be"</div>
+      <div class="lesson-objective" style="opacity:0.5">I can ask and answer yes/no questions using "is" and "are".</div>
+      <div class="lesson-card-footer-lg" style="border-top:1px solid var(--border)">
+        <span class="status-pill status-pill-locked">🔒 Locked</span>
+      </div>
+      <div class="lx-locked-tooltip" id="locked-tooltip-isit" aria-live="polite" role="status" style="display:none"></div>
+    </div>`;
+    col.appendChild(lockedCard);
 
     return col;
   }
@@ -349,6 +454,243 @@
     col.appendChild(statsCard);
 
     return col;
+  }
+
+  // ══════════════════════════════════════════════
+  // ── LESSON REVIEW VIEW  (#/lesson/:id/review) ──
+  // ══════════════════════════════════════════════
+  function renderLessonReviewView() {
+    const lessonId = st.reviewLessonId || 'A1-BE-LOST-PROPERTY-001';
+    const currLesson = LX.curriculum.getLessonById(lessonId) || LX.lesson_A1_001;
+    const allAttempts = P.getAllAttempts().filter(a => a.status === 'COMPLETED');
+    const latestCompleted = P.getLatestCompletedAttempt();
+    const fam = (LX.scenarioFamilies || []).find(f => f.id === currLesson.scenarioFamily);
+    const familyLabel = fam ? (fam.emoji + ' ' + fam.name) : (currLesson.scenarioFamily || '');
+
+    const div = el('div', 'lx-review-page');
+    div.innerHTML = `
+    <div class="lx-review-header">
+      <div class="lx-review-breadcrumb">
+        <button class="nav-back-btn" id="review-back-dashboard-btn">← Dashboard</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+        ${_cefrBadgeBtn(currLesson.cefrLevel || 'A1')}
+        <span class="lesson-family">${familyLabel}</span>
+      </div>
+      <h1 class="lx-review-title">${esc(currLesson.title)}</h1>
+      <p class="lx-review-objective">${esc(currLesson.objective)}</p>
+    </div>
+
+    <div class="lx-review-actions">
+      <div class="lx-review-action-card">
+        <div class="lx-review-action-icon">📖</div>
+        <div class="lx-review-action-title">Review Lesson</div>
+        <div class="lx-review-action-desc">Go through the lesson content again and revisit each stage.</div>
+        <button class="btn-start lx-review-action-btn" id="review-go-lesson-btn">Open Lesson →</button>
+      </div>
+
+      <div class="lx-review-action-card lx-review-action-card--coming">
+        <div class="lx-review-action-icon">🔄</div>
+        <div class="lx-review-action-title">Restart Lesson</div>
+        <div class="lx-review-action-desc">Start a new attempt from the beginning to improve your score.</div>
+        <div class="lx-coming-badge">Coming in Module D</div>
+      </div>
+
+      <div class="lx-review-action-card lx-review-action-card--coming">
+        <div class="lx-review-action-icon">📊</div>
+        <div class="lx-review-action-title">View Attempt History</div>
+        <div class="lx-review-action-desc">Compare all your attempts and track your progress over time.</div>
+        ${allAttempts.length > 0 ? `<button class="btn-outline-sm" id="review-go-attempts-btn">View ${allAttempts.length} attempt${allAttempts.length !== 1 ? 's' : ''} →</button>` : '<div class="lx-coming-badge">Coming in Module D</div>'}
+      </div>
+    </div>
+
+    ${latestCompleted ? `
+    <div class="lx-review-summary">
+      <div class="sidebar-card-title" style="margin-bottom:12px">📝 Latest Attempt Summary</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">
+        <div class="lx-review-stat">
+          <div class="lx-review-stat-val" style="color:var(--green)">${latestCompleted.total_score !== null ? latestCompleted.total_score + '/16' : '—'}</div>
+          <div class="lx-review-stat-label">Score</div>
+        </div>
+        <div class="lx-review-stat">
+          <div class="lx-review-stat-val" style="color:${P.getResultBandColor(latestCompleted.result_band)}">${P.getResultBandLabel(latestCompleted.result_band)}</div>
+          <div class="lx-review-stat-label">Result</div>
+        </div>
+        <div class="lx-review-stat">
+          <div class="lx-review-stat-val">${P.formatDate(latestCompleted.completed_at)}</div>
+          <div class="lx-review-stat-label">Completed</div>
+        </div>
+      </div>
+    </div>` : ''}`;
+    return div;
+  }
+
+  // ══════════════════════════════════════════════
+  // ── LEARNING PATH VIEW  (#/path) ──
+  // ══════════════════════════════════════════════
+  function renderPathView() {
+    const curriculum = LX.curriculum;
+    const div = el('div', 'lx-path-page');
+    div.innerHTML = `
+    <div class="dashboard-header">
+      <button class="nav-back-btn" id="path-back-btn" style="margin-bottom:8px">← Dashboard</button>
+      <div class="dashboard-title">📚 Your Learning Path</div>
+      <div style="font-size:14px;color:var(--grey);margin-top:4px">Explore all levels and lessons — from A0 to C2.</div>
+    </div>
+    <div class="lx-path-levels">
+      ${curriculum.LEVEL_ORDER.map(code => {
+        const lvl = curriculum.levels[code];
+        const counts = curriculum.counts;
+        const published = (code === 'A1') ? 1 : 0;
+        const levelCounts = _getLevelCounts(code);
+        const isActive = code === 'A1';
+        return `
+        <button class="lx-path-level-card${isActive ? ' lx-path-level-active' : ''}" data-nav-path="/path/${code}">
+          <div class="lx-path-level-header">
+            <span class="cefr-badge cefr-${code.toLowerCase()}">${code}</span>
+            <span class="lx-path-level-title">${_levelDisplayName(code)}</span>
+            ${published > 0 ? `<span class="lx-path-published-dot" title="${published} published lesson">●</span>` : ''}
+          </div>
+          <div class="lx-path-level-desc">${esc(lvl ? lvl.levelPurpose || '' : '').slice(0, 100)}${(lvl && lvl.levelPurpose && lvl.levelPurpose.length > 100) ? '…' : ''}</div>
+          <div class="lx-path-level-meta">
+            <span>${levelCounts.total} lesson${levelCounts.total !== 1 ? 's' : ''}</span>
+            ${levelCounts.published > 0 ? `<span style="color:var(--green)">● ${levelCounts.published} published</span>` : ''}
+          </div>
+        </button>`;
+      }).join('')}
+    </div>
+    <div class="lx-path-note">
+      <div style="font-size:13px;color:var(--grey);text-align:center;padding:16px 0">
+        Full unit and lesson details coming in Module C. Click any level to explore.
+      </div>
+    </div>`;
+    return div;
+  }
+
+  function _getLevelCounts(code) {
+    const lessons = LX.curriculum.getLessonsByLevel(code);
+    const published = lessons.filter(l => l.contentStatus === 'PUBLISHED').length;
+    return { total: lessons.length, published };
+  }
+
+  function _levelDisplayName(code) {
+    return {
+      A0: 'Foundation / Pre-A1',
+      A1: 'Beginner',
+      A2: 'Elementary',
+      B1: 'Intermediate',
+      B2: 'Upper Intermediate',
+      C1: 'Advanced',
+      C2: 'Proficiency',
+    }[code] || code;
+  }
+
+  // ══════════════════════════════════════════════
+  // ── LEVEL PATH VIEW  (#/path/:level) ──
+  // ══════════════════════════════════════════════
+  function renderLevelPathView() {
+    const code = (st.pathLevel || 'A1').toUpperCase();
+    const curriculum = LX.curriculum;
+    const lvl = curriculum.levels[code];
+    const lessons = curriculum.getLessonsByLevel(code);
+    const units = curriculum.getUnitsByLevel(code);
+
+    const div = el('div', 'lx-level-path-page');
+    div.innerHTML = `
+    <div class="dashboard-header">
+      <button class="nav-back-btn" id="level-back-btn" style="margin-bottom:8px">← Learning Path</button>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px">
+        <span class="cefr-badge cefr-${code.toLowerCase()}" style="font-size:14px;padding:5px 14px">${code}</span>
+        <div class="dashboard-title" style="margin:0">${_levelDisplayName(code)}</div>
+      </div>
+      ${lvl ? `<div style="font-size:14px;color:var(--grey);margin-top:4px;max-width:600px">${esc(lvl.levelPurpose || '').slice(0, 180)}${lvl.levelPurpose && lvl.levelPurpose.length > 180 ? '…' : ''}</div>` : ''}
+    </div>
+
+    <div class="lx-level-stats">
+      <div class="lx-level-stat-pill"><strong>${lessons.length}</strong> lessons</div>
+      <div class="lx-level-stat-pill"><strong>${lessons.filter(l => l.contentStatus === 'PUBLISHED').length}</strong> published</div>
+      <div class="lx-level-stat-pill"><strong>${(units || []).length}</strong> units</div>
+    </div>
+
+    ${lvl && lvl.endOfLevelOutcomes && lvl.endOfLevelOutcomes.length ? `
+    <div class="lx-level-outcomes">
+      <div class="sidebar-card-title" style="margin-bottom:10px">🎯 What you will be able to do at ${code} level</div>
+      <ul class="lx-outcome-list">
+        ${lvl.endOfLevelOutcomes.slice(0, 6).map(o => `<li>${esc(o)}</li>`).join('')}
+        ${lvl.endOfLevelOutcomes.length > 6 ? `<li style="color:var(--grey)">… and ${lvl.endOfLevelOutcomes.length - 6} more</li>` : ''}
+      </ul>
+    </div>` : ''}
+
+    <div class="lx-level-lessons-header">
+      <div class="sidebar-card-title">📖 Lessons at ${code} level</div>
+      <div style="font-size:12px;color:var(--grey)">Full unit view coming in Module C</div>
+    </div>
+    <div class="lx-level-lesson-list">
+      ${lessons.slice(0, 20).map(l => _renderMiniLessonRow(l)).join('')}
+      ${lessons.length > 20 ? `<div style="text-align:center;padding:12px;font-size:13px;color:var(--grey)">…and ${lessons.length - 20} more lessons</div>` : ''}
+    </div>`;
+    return div;
+  }
+
+  function _renderMiniLessonRow(l) {
+    const isPublished = l.contentStatus === 'PUBLISHED';
+    const fam = (LX.scenarioFamilies || []).find(f => f.id === l.scenarioFamily);
+    const famLabel = fam ? fam.emoji + ' ' + fam.name : '';
+    if (isPublished) {
+      return `<button class="lx-mini-lesson-row lx-mini-lesson-published" data-nav-lesson="${l.id}" aria-label="Open lesson: ${esc(l.title)}">
+        <span class="lx-mini-lesson-title">${esc(l.title)}</span>
+        <span class="lx-mini-lesson-meta">${famLabel} · ${l.estimatedMinutes} min</span>
+        <span class="lx-mini-lesson-status lx-mini-status-published">● Published</span>
+        <span class="lx-mini-lesson-arrow">→</span>
+      </button>`;
+    }
+    return `<div class="lx-mini-lesson-row lx-mini-lesson-planned">
+      <span class="lx-mini-lesson-title" style="opacity:0.6">${esc(l.title)}</span>
+      <span class="lx-mini-lesson-meta">${famLabel} · ${l.estimatedMinutes} min</span>
+      <span class="lx-mini-lesson-status lx-mini-status-planned">🕐 Planned</span>
+    </div>`;
+  }
+
+  // ══════════════════════════════════════════════
+  // ── SCENARIO VIEW  (#/scenario/:family) ──
+  // ══════════════════════════════════════════════
+  function renderScenarioView() {
+    const familyId = st.scenarioFamily || 'community_public';
+    const fam = (LX.scenarioFamilies || []).find(f => f.id === familyId);
+    const familyName = fam ? fam.name : familyId;
+    const familyEmoji = fam ? fam.emoji : '';
+    const lessons = LX.curriculum.getLessonsByScenario(familyId);
+    const published = lessons.filter(l => l.contentStatus === 'PUBLISHED');
+
+    const div = el('div', 'lx-scenario-page');
+    div.innerHTML = `
+    <div class="dashboard-header">
+      <button class="nav-back-btn" id="scenario-back-btn" style="margin-bottom:8px">← Dashboard</button>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px">
+        <span class="lesson-family" style="font-size:13px;padding:4px 12px">${familyEmoji} ${esc(familyName)}</span>
+      </div>
+      <div class="dashboard-title" style="font-size:22px">${familyEmoji} ${esc(familyName)}</div>
+      <div style="font-size:14px;color:var(--grey);margin-top:4px">${lessons.length} lesson${lessons.length !== 1 ? 's' : ''} in this topic${published.length > 0 ? ` · ${published.length} available now` : ''}</div>
+    </div>
+
+    ${published.length > 0 ? `
+    <div class="lx-scenario-section">
+      <div class="sidebar-card-title" style="margin-bottom:12px">✅ Available Now</div>
+      ${published.map(l => _renderMiniLessonRow(l)).join('')}
+    </div>` : ''}
+
+    <div class="lx-scenario-section">
+      <div class="sidebar-card-title" style="margin-bottom:12px">📋 All Lessons in This Topic</div>
+      ${lessons.length === 0
+        ? `<div class="empty-state"><div class="empty-state-text">No lessons found for this topic yet.</div></div>`
+        : lessons.map(l => _renderMiniLessonRow(l)).join('')
+      }
+    </div>
+
+    <div style="text-align:center;padding:16px;font-size:13px;color:var(--grey)">
+      Browse other topics from the dashboard lesson cards.
+    </div>`;
+    return div;
   }
 
   function _reviewTypeLabel(type) {
@@ -2334,31 +2676,169 @@
       });
     }
 
+    const navPathLink = document.getElementById('nav-path-link');
+    if (navPathLink) {
+      navPathLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        navigate('/path');
+      });
+    }
+
+    // ── GENERIC badge navigation (data-nav-path / data-nav-scenario / data-nav-lesson) ──
+    // These are set on CEFR badge buttons and scenario badge buttons throughout the app.
+    $$('[data-nav-path]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        navigate(btn.dataset.navPath);
+      });
+    });
+
+    $$('[data-nav-scenario]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        navigate('/scenario/' + btn.dataset.navScenario);
+      });
+    });
+
+    $$('[data-nav-lesson]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Mini lesson rows in path/scenario views
+        const lid = btn.dataset.navLesson;
+        if (lid === 'A1-BE-LOST-PROPERTY-001') {
+          _startOrResumeLesson(false);
+        } else {
+          // Future: navigate to that lesson. For now show it's coming.
+          _showComingSoonModal('This lesson content is being prepared.');
+        }
+      });
+    });
+
+    // ── CARD-LEVEL click handlers for interactive cards ──
+    $$('.lx-card-interactive').forEach(card => {
+      const primaryAction = () => {
+        const action = card.dataset.cardAction;
+        const lessonId = card.dataset.lessonId;
+        if (action === 'start') _startOrResumeLesson(false);
+        else if (action === 'continue') _startOrResumeLesson(false);
+        else if (action === 'review') navigate('/lesson/' + (lessonId || 'A1-BE-LOST-PROPERTY-001') + '/review');
+      };
+      card.addEventListener('click', (e) => {
+        // Only fire if the click target is NOT an inner button/link
+        if (e.target.closest('button') || e.target.closest('a')) return;
+        primaryAction();
+      });
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); primaryAction(); }
+      });
+    });
+
+    // Planned card — show explanation, do not open lesson
+    $$('.lx-card-planned').forEach(card => {
+      const showPlanned = () => {
+        const tooltip = card.querySelector('.lx-planned-tooltip');
+        if (tooltip) {
+          tooltip.style.display = 'block';
+          tooltip.textContent = 'This lesson is planned and will be available when it is created and published.';
+        }
+      };
+      card.addEventListener('click', showPlanned);
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showPlanned(); }
+      });
+    });
+
+    // Locked card — show prerequisite explanation, do not open lesson
+    $$('.lx-card-locked').forEach(card => {
+      const showLocked = () => {
+        const tooltip = card.querySelector('.lx-locked-tooltip');
+        if (tooltip) {
+          tooltip.style.display = 'block';
+          tooltip.textContent = 'Complete "Lost Property: Is This Your Bag?" first to unlock this lesson.';
+        }
+      };
+      card.addEventListener('click', showLocked);
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showLocked(); }
+      });
+    });
+
+    // ── Lesson title buttons (card-action delegates) ──
+    $$('.lx-card-title-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const action = btn.dataset.cardAction;
+        const lessonId = btn.dataset.lessonId;
+        if (action === 'start') _startOrResumeLesson(false);
+        else if (action === 'continue') _startOrResumeLesson(false);
+        else if (action === 'review') navigate('/lesson/' + (lessonId || 'A1-BE-LOST-PROPERTY-001') + '/review');
+      });
+    });
+
+    // ── Inline status badge buttons (in-progress / completed clickable) ──
+    $$('.lx-inline-status-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const action = btn.dataset.cardAction;
+        const lessonId = btn.dataset.lessonId;
+        if (action === 'continue') _startOrResumeLesson(false);
+        else if (action === 'review') navigate('/lesson/' + (lessonId || 'A1-BE-LOST-PROPERTY-001') + '/review');
+      });
+    });
+
+    // ── Arrow buttons ──
+    $$('.lx-card-arrow-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const action = btn.dataset.cardAction;
+        const lessonId = btn.dataset.lessonId;
+        if (action === 'continue') _startOrResumeLesson(false);
+        else if (action === 'review') navigate('/lesson/' + (lessonId || 'A1-BE-LOST-PROPERTY-001') + '/review');
+        else if (action === 'start') _startOrResumeLesson(false);
+      });
+    });
+
+    // ── Review lesson btn (in completed card) ──
+    const reviewLessonBtn = document.getElementById('review-lesson-btn');
+    if (reviewLessonBtn) {
+      reviewLessonBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const lid = reviewLessonBtn.dataset.lessonId || 'A1-BE-LOST-PROPERTY-001';
+        navigate('/lesson/' + lid + '/review');
+      });
+    }
+
     // ── DASHBOARD buttons ──
     const startBtn = document.getElementById('start-lesson-btn');
     if (startBtn) {
-      startBtn.addEventListener('click', () => {
+      startBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         _startOrResumeLesson(false);
       });
     }
 
     const continueBtn = document.getElementById('continue-lesson-btn');
     if (continueBtn) {
-      continueBtn.addEventListener('click', () => {
+      continueBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         _startOrResumeLesson(false);
       });
     }
 
     const newAttemptBtnDash = document.getElementById('new-attempt-btn');
     if (newAttemptBtnDash) {
-      newAttemptBtnDash.addEventListener('click', () => {
+      newAttemptBtnDash.addEventListener('click', (e) => {
+        e.stopPropagation();
         _showNewAttemptConfirm();
       });
     }
 
     const viewAttemptsBtnCard = document.getElementById('view-attempts-btn-card');
     if (viewAttemptsBtnCard) {
-      viewAttemptsBtnCard.addEventListener('click', () => navigate('/attempts'));
+      viewAttemptsBtnCard.addEventListener('click', (e) => {
+        e.stopPropagation();
+        navigate('/attempts');
+      });
     }
 
     const compareAttemptsBtnSidebar = document.getElementById('compare-attempts-btn');
@@ -2371,6 +2851,36 @@
         navigate('/attempts/compare');
       });
     }
+
+    // ── LESSON REVIEW PAGE buttons ──
+    const reviewBackBtn = document.getElementById('review-back-dashboard-btn');
+    if (reviewBackBtn) reviewBackBtn.addEventListener('click', () => navigate(''));
+
+    const reviewGoLessonBtn = document.getElementById('review-go-lesson-btn');
+    if (reviewGoLessonBtn) {
+      reviewGoLessonBtn.addEventListener('click', () => _startOrResumeLesson(false));
+    }
+
+    const reviewGoAttemptsBtn = document.getElementById('review-go-attempts-btn');
+    if (reviewGoAttemptsBtn) reviewGoAttemptsBtn.addEventListener('click', () => navigate('/attempts'));
+
+    // ── PATH VIEW buttons ──
+    const pathBackBtn = document.getElementById('path-back-btn');
+    if (pathBackBtn) pathBackBtn.addEventListener('click', () => navigate(''));
+
+    $$('.lx-path-level-card').forEach(card => {
+      card.addEventListener('click', () => {
+        navigate(card.dataset.navPath);
+      });
+    });
+
+    // ── LEVEL PATH VIEW buttons ──
+    const levelBackBtn = document.getElementById('level-back-btn');
+    if (levelBackBtn) levelBackBtn.addEventListener('click', () => navigate('/path'));
+
+    // ── SCENARIO VIEW buttons ──
+    const scenarioBackBtn = document.getElementById('scenario-back-btn');
+    if (scenarioBackBtn) scenarioBackBtn.addEventListener('click', () => navigate(''));
 
     // ── LESSON buttons ──
     const saveExitBtn = document.getElementById('save-exit-btn');
@@ -2937,6 +3447,25 @@
   }
 
   // ── HELPER: Show new attempt confirmation modal ──
+  // ── HELPER: Coming soon modal ──
+  function _showComingSoonModal(msg) {
+    const existing = document.getElementById('lx-coming-modal');
+    if (existing) existing.remove();
+    const modal = el('div', 'lx-modal-overlay');
+    modal.id = 'lx-coming-modal';
+    modal.innerHTML = `
+    <div class="lx-modal">
+      <div style="font-size:18px;font-weight:700;color:var(--navy);margin-bottom:12px">🕐 Coming Soon</div>
+      <div style="font-size:14px;color:var(--grey);margin-bottom:20px;line-height:1.6">${esc(msg || 'This lesson is planned and will be available when it is created and published.')}</div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn-start" id="modal-coming-close">OK</button>
+      </div>
+    </div>`;
+    document.body.appendChild(modal);
+    document.getElementById('modal-coming-close').addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+  }
+
   function _showNewAttemptConfirm() {
     const modal = el('div', 'lx-modal-overlay');
     modal.innerHTML = `
@@ -3195,7 +3724,16 @@
 
   // ── INIT ──
   function init() {
+    // Hydrate routing state from current hash before first render
+    const initHash = location.hash.replace('#', '') || '';
     st.currentView = getRoute();
+    if (initHash.startsWith('/lesson/') && initHash.includes('/review')) {
+      st.reviewLessonId = initHash.replace('/lesson/', '').replace('/review', '');
+    } else if (initHash.startsWith('/path/')) {
+      st.pathLevel = initHash.replace('/path/', '');
+    } else if (initHash.startsWith('/scenario/')) {
+      st.scenarioFamily = initHash.replace('/scenario/', '');
+    }
     // Wire _renderLesson so state.js._navigateToStage can trigger a re-render
     LX._renderLesson = function() {
       st.currentView = 'lesson';

@@ -28,7 +28,7 @@
   // ── RUNTIME STATE ──
   const state = {
     currentRole: 'learner',    // learner | teacher | platform_admin
-    currentView: 'dashboard',  // dashboard | lesson | teacher | admin | attempts | attempt_detail | attempt_compare
+    currentView: 'dashboard',  // dashboard | lesson | lesson_review | teacher | admin | attempts | attempt_detail | attempt_compare | path | level_path | scenario
     currentLessonId: P.LESSON_ID,
     currentStage: 0,           // index into STAGES array
 
@@ -36,6 +36,11 @@
     currentAttemptId: null,
     isReadOnly: false,
     readOnlyAttemptId: null,
+
+    // Phase 2 Module B — routing state
+    reviewLessonId: null,       // lesson id for #/lesson/:id/review
+    pathLevel: null,            // level code for #/path/:level
+    scenarioFamily: null,       // scenario family id for #/scenario/:family
 
     // Compare mode
     compareAttemptIds: [null, null],

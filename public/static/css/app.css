@@ -957,3 +957,259 @@ table.grammar-table {
   from { opacity: 0; transform: translateX(-8px); }
   to { opacity: 1; transform: translateX(0); }
 }
+
+/* ══════════════════════════════════════════════
+   PHASE 2 — MODULE B: Dashboard & Navigation
+   ══════════════════════════════════════════════ */
+
+/* ── Nav learning path link ── */
+.nav-path-link {
+  font-size: 13px; font-weight: 600; color: var(--accent);
+  text-decoration: none; padding: 5px 10px;
+  border-radius: var(--radius-sm); border: 1.5px solid var(--accent-light);
+  background: var(--accent-light);
+  transition: all 0.15s;
+}
+.nav-path-link:hover { background: var(--accent); color: white; }
+
+/* ── Clickable badge buttons (CEFR / scenario) ── */
+.lx-badge-btn {
+  cursor: pointer; border: none; background: inherit;
+  font-family: var(--font); font-size: inherit; font-weight: inherit;
+  transition: filter 0.15s, transform 0.1s, box-shadow 0.15s;
+  display: inline-flex; align-items: center; gap: 4px;
+  text-align: left;
+}
+.lx-badge-btn:hover {
+  filter: brightness(0.92);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+.lx-badge-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 20px;
+}
+.lx-badge-btn:active { transform: translateY(0); }
+
+/* ── Interactive card (READY/IN-PROGRESS/COMPLETED) ── */
+.lx-card-interactive {
+  cursor: default; /* card itself not a pointer — inner elements handle it */
+}
+.lx-card-interactive:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+.lx-card-interactive:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+
+/* ── Planned card — non-interactive visual ── */
+.lx-card-planned {
+  cursor: default !important;
+  opacity: 0.85;
+}
+.lx-card-planned:hover { box-shadow: none; transform: none; }
+.lx-card-planned:focus-visible {
+  outline: 2px dashed var(--grey-light);
+  outline-offset: 2px;
+}
+
+/* ── Locked card — focus shows explanation ── */
+.lx-card-locked {
+  cursor: default !important;
+  opacity: 0.8;
+}
+.lx-card-locked:hover { box-shadow: none; transform: none; }
+.lx-card-locked:focus-visible {
+  outline: 2px dashed var(--grey-light);
+  outline-offset: 2px;
+}
+
+/* ── Tooltip messages inside planned/locked cards ── */
+.lx-planned-tooltip, .lx-locked-tooltip {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px; font-weight: 600;
+  line-height: 1.5;
+  animation: fadeIn 0.2s ease;
+}
+.lx-planned-tooltip {
+  background: #FFF8E1; color: #7C5E00;
+  border: 1px solid #F9C945;
+}
+.lx-locked-tooltip {
+  background: #FFF0F0; color: #9E1C1C;
+  border: 1px solid #F7AAAA;
+}
+
+/* ── Lesson title as a button (accessible) ── */
+.lesson-title-link.lx-card-title-btn {
+  display: block; width: 100%;
+  background: none; border: none; padding: 0;
+  font-size: 17px; font-weight: 700; color: var(--navy);
+  margin-bottom: 6px; cursor: pointer;
+  text-align: left; font-family: var(--font);
+  line-height: 1.3;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.lesson-title-link.lx-card-title-btn:hover { color: var(--accent); text-decoration: underline; }
+.lesson-title-link.lx-card-title-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* ── Inline status badge as button ── */
+.lx-inline-status-btn {
+  cursor: pointer; border: none; font-family: var(--font);
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 12px; border-radius: 20px;
+  font-size: 12px; font-weight: 600;
+  transition: filter 0.15s, transform 0.1s;
+}
+.lx-inline-status-btn:hover { filter: brightness(0.92); transform: translateY(-1px); }
+.lx-inline-status-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 20px; }
+
+/* ── Card arrow button ── */
+.lx-card-arrow-btn {
+  padding: 6px 12px; border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border); background: transparent;
+  font-size: 16px; font-weight: 700; color: var(--grey);
+  cursor: pointer; transition: all 0.15s;
+  line-height: 1;
+}
+.lx-card-arrow-btn:hover { background: var(--accent); color: white; border-color: var(--accent); transform: translateX(2px); }
+.lx-card-arrow-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ── Primary card button (remove duplicate click area confusion) ── */
+.lx-card-primary-btn { }  /* Already styled by btn-start / btn-continue / btn-review */
+
+/* ══════════════════════════════════════════════
+   MODULE B — LESSON REVIEW PAGE
+   ══════════════════════════════════════════════ */
+.lx-review-page { max-width: 720px; margin: 0 auto; padding: 0 0 40px; }
+.lx-review-header {
+  background: var(--white); border-radius: var(--radius-lg);
+  border: 1px solid var(--border); padding: 24px 28px;
+  margin-bottom: 20px; box-shadow: var(--shadow-sm);
+}
+.lx-review-breadcrumb { margin-bottom: 12px; }
+.lx-review-title { font-size: 22px; font-weight: 800; color: var(--navy); margin: 8px 0; }
+.lx-review-objective { font-size: 14px; color: var(--grey); line-height: 1.6; margin: 0; }
+.lx-review-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px; margin-bottom: 20px;
+}
+.lx-review-action-card {
+  background: var(--white); border-radius: var(--radius-lg);
+  border: 1px solid var(--border); padding: 20px;
+  display: flex; flex-direction: column; gap: 8px;
+  box-shadow: var(--shadow-sm);
+}
+.lx-review-action-card--coming { opacity: 0.7; }
+.lx-review-action-icon { font-size: 28px; }
+.lx-review-action-title { font-size: 16px; font-weight: 700; color: var(--navy); }
+.lx-review-action-desc { font-size: 13px; color: var(--grey); line-height: 1.5; flex: 1; }
+.lx-review-action-btn { align-self: flex-start; margin-top: 8px; }
+.lx-coming-badge {
+  display: inline-block; font-size: 11px; font-weight: 600;
+  color: var(--grey); background: var(--grey-bg);
+  padding: 3px 10px; border-radius: 20px; margin-top: 4px;
+}
+.lx-review-summary {
+  background: var(--white); border-radius: var(--radius-lg);
+  border: 1px solid var(--border); padding: 20px 24px;
+  box-shadow: var(--shadow-sm);
+}
+.lx-review-stat { text-align: center; padding: 8px; }
+.lx-review-stat-val { font-size: 22px; font-weight: 800; line-height: 1.2; }
+.lx-review-stat-label { font-size: 11px; color: var(--grey); margin-top: 2px; }
+
+/* ══════════════════════════════════════════════
+   MODULE B — LEARNING PATH PAGE (#/path)
+   ══════════════════════════════════════════════ */
+.lx-path-page { max-width: 900px; margin: 0 auto; padding: 0 0 40px; }
+.lx-path-levels {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px; margin-bottom: 16px;
+}
+.lx-path-level-card {
+  background: var(--white); border-radius: var(--radius-lg);
+  border: 2px solid var(--border); padding: 18px;
+  cursor: pointer; transition: all 0.18s;
+  text-align: left; font-family: var(--font);
+  display: flex; flex-direction: column; gap: 8px;
+  box-shadow: var(--shadow-sm);
+}
+.lx-path-level-card:hover { border-color: var(--accent-light); box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.lx-path-level-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lx-path-level-active { border-color: var(--accent); background: var(--accent-light); }
+.lx-path-level-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lx-path-level-title { font-size: 13px; font-weight: 700; color: var(--navy); }
+.lx-path-published-dot { color: var(--green); font-size: 10px; margin-left: auto; }
+.lx-path-level-desc { font-size: 12px; color: var(--grey); line-height: 1.5; }
+.lx-path-level-meta { display: flex; gap: 10px; font-size: 11px; color: var(--grey); margin-top: 4px; }
+
+/* ══════════════════════════════════════════════
+   MODULE B — LEVEL PATH PAGE (#/path/:level)
+   ══════════════════════════════════════════════ */
+.lx-level-path-page { max-width: 800px; margin: 0 auto; padding: 0 0 40px; }
+.lx-level-stats {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  margin-bottom: 18px;
+}
+.lx-level-stat-pill {
+  padding: 5px 14px; border-radius: 20px;
+  background: var(--grey-bg); color: var(--grey);
+  font-size: 12px; font-weight: 600;
+}
+.lx-level-outcomes {
+  background: var(--white); border-radius: var(--radius-lg);
+  border: 1px solid var(--border); padding: 18px 22px;
+  margin-bottom: 16px; box-shadow: var(--shadow-sm);
+}
+.lx-outcome-list {
+  margin: 0; padding-left: 20px;
+  list-style: disc;
+}
+.lx-outcome-list li { font-size: 13px; color: var(--navy); margin-bottom: 5px; line-height: 1.5; }
+.lx-level-lessons-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 10px; gap: 8px;
+}
+.lx-level-lesson-list { display: flex; flex-direction: column; gap: 6px; }
+
+/* Mini lesson row (used in level path and scenario views) */
+.lx-mini-lesson-row {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 14px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--white);
+  font-family: var(--font); font-size: 13px; text-align: left;
+}
+.lx-mini-lesson-published {
+  cursor: pointer; transition: all 0.15s;
+  border-color: var(--accent-light);
+}
+.lx-mini-lesson-published:hover { background: var(--accent-light); border-color: var(--accent); transform: translateX(2px); }
+.lx-mini-lesson-published:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lx-mini-lesson-planned { cursor: default; opacity: 0.7; }
+.lx-mini-lesson-title { flex: 1; font-weight: 600; color: var(--navy); min-width: 120px; }
+.lx-mini-lesson-meta { font-size: 11px; color: var(--grey); }
+.lx-mini-lesson-status { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+.lx-mini-status-published { background: var(--green-light); color: var(--green); }
+.lx-mini-status-planned { background: var(--grey-bg); color: var(--grey); }
+.lx-mini-lesson-arrow { font-size: 14px; color: var(--accent); font-weight: 700; margin-left: auto; }
+
+/* ══════════════════════════════════════════════
+   MODULE B — SCENARIO PAGE (#/scenario/:family)
+   ══════════════════════════════════════════════ */
+.lx-scenario-page { max-width: 800px; margin: 0 auto; padding: 0 0 40px; }
+.lx-scenario-section {
+  background: var(--white); border-radius: var(--radius-lg);
+  border: 1px solid var(--border); padding: 18px 22px;
+  margin-bottom: 16px; box-shadow: var(--shadow-sm);
+}
+
