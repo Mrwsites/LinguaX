@@ -1,37 +1,52 @@
-/* ===== LinguaX Curriculum Data — Phase 2 Batch 1 ===== */
+/* ===== LinguaX Curriculum Data — Phase 2 Batch 2 ===== */
 /*
- * Complete A0–C2 curriculum map.
+ * Complete A0–C2 curriculum map — updated Phase 2 Batch 2.
  *
- * Each level contains:
- *   levelPurpose          — why this level exists in the learning journey
- *   entryExpectations     — what a learner must already control to start here
- *   endOfLevelOutcomes    — what a learner can do on exit
- *   units[]               — ordered array of unit objects
- *     unit.lessons[]      — ordered lesson stubs (no bodies yet)
- *       lesson.status     — "PUBLISHED" | "PLANNED"
- *   grammarProgression[]  — ordered grammar targets for the level
- *   vocabularyThemes[]    — thematic vocabulary sets
- *   languageFunctions[]   — communicative functions practised
- *   scenarioFamilies[]    — real-world scenario families used
- *   assessmentCheckpoints[]— formal / informal checkpoints
- *   reviewStrategy        — how SRS / recycling is handled at this level
- *   finalChallenge        — end-of-level capstone task description
- *   launchPriority        — "P0" | "P1" | "P2"
+ * LESSON FIELDS (each lesson stub carries):
+ *   id               — unique lesson identifier
+ *   title            — lesson title
+ *   contentType      — always "CURATED_CORE" (all seeded lessons)
+ *   contentStatus    — editorial status: PLANNED | DRAFT | IN_REVIEW | PUBLISHED | ARCHIVED
+ *   launchPriority   — P0 | P1 | P2
+ *   estimatedMinutes — learning time
+ *   scenarioFamily   — scenario family id
+ *   grammarFocus     — grammar point ids used
+ *   objective        — I can … statement
+ *   bodyRef          — (PUBLISHED only) pointer to the lesson body object
  *
- * Lesson status values:
- *   "PUBLISHED"  — full lesson body exists and is live (currently 1 lesson only)
- *   "PLANNED"    — lesson is scoped but body not yet written
+ * LEARNER STATE (resolved dynamically, never stored on the stub):
+ *   COMING_SOON      — contentStatus is PLANNED/DRAFT/IN_REVIEW
+ *   LOCKED           — PUBLISHED but prerequisite not met
+ *   READY            — PUBLISHED and prerequisites met, not started
+ *   IN_PROGRESS      — started but not completed
+ *   COMPLETED        — completed at least once
+ *   REVIEW_DUE       — completed with a due SRS review
  *
- * The single PUBLISHED lesson is:
+ * The single PUBLISHED lesson:
  *   A1 → Unit 1: Me, My Things, and Basic Descriptions → Lesson 4
  *   id: "A1-BE-LOST-PROPERTY-001"
- *   Its full body lives in window.LX.lesson_A1_001 (data.js — unchanged).
+ *   bodyRef: "window.LX.lesson_A1_001"  (full body in data.js — unchanged)
  *
- * Import pattern (next batch):
- *   window.LX.curriculum is available after this file loads.
- *   Access a level:  window.LX.curriculum.levels.A1
- *   Access a lesson: window.LX.curriculum.getLessonById('A1-BE-LOST-PROPERTY-001')
- *   Count helpers:   window.LX.curriculum.counts
+ * Curriculum API (window.LX.curriculum):
+ *   .levels             — map of level objects
+ *   .LEVEL_ORDER        — ['A0','A1','A2','B1','B2','C1','C2']
+ *   .counts             — pre-built summary counts
+ *   .getLessonById(id)
+ *   .getLessonsByLevel(code)
+ *   .getLessonsByUnit(unitCode)
+ *   .getPublishedLessons()
+ *   .getPathByLevel(code)
+ *   .getUnitsByLevel(code)
+ *   .getPrerequisites(lessonId)
+ *   .getNextLesson(lessonId)
+ *   .getLessonsByPriority(priority)
+ *   .getLessonsByStatus(status)
+ *   .getLessonAvailability(lessonId, learnerProgress)
+ *   .getUnitProgress(unitCode, learnerProgress)
+ *   .getLevelProgress(levelCode, learnerProgress)
+ *   .getLessonsByScenario(scenarioFamily)
+ *   .getLessonsByGrammarPoint(grammarPointId)
+ *   .getReviewDueLessons(learnerId)          — stub; full impl in persist.js
  */
 
 (function () {
@@ -41,17 +56,33 @@
 
   /* ─────────────────────────────────────────────
      HELPER — build a PLANNED lesson stub
+     p = launchPriority ('P0' | 'P1' | 'P2'); defaults to 'P1'
   ───────────────────────────────────────────── */
-  function planned(id, title, estimatedMinutes, scenarioFamily, grammarFocus, objective) {
+  function planned(id, title, estimatedMinutes, scenarioFamily, grammarFocus, objective, p) {
     return {
       id: id,
       title: title,
+      contentType: 'CURATED_CORE',
+      contentStatus: 'PLANNED',
+      launchPriority: p || 'P1',
+      /* legacy compat — some older UI code reads .status */
       status: 'PLANNED',
       estimatedMinutes: estimatedMinutes || 25,
       scenarioFamily: scenarioFamily || 'personal_life',
       grammarFocus: grammarFocus || [],
       objective: objective || '',
     };
+  }
+
+  /* Shorthand helpers for common priority variants */
+  function p0(id, title, mins, scenario, grammar, obj) {
+    return planned(id, title, mins, scenario, grammar, obj, 'P0');
+  }
+  function p1(id, title, mins, scenario, grammar, obj) {
+    return planned(id, title, mins, scenario, grammar, obj, 'P1');
+  }
+  function p2(id, title, mins, scenario, grammar, obj) {
+    return planned(id, title, mins, scenario, grammar, obj, 'P2');
   }
 
   /* ─────────────────────────────────────────────
@@ -62,6 +93,10 @@
     return {
       id: 'A1-BE-LOST-PROPERTY-001',
       title: 'Lost Property: Is This Your Bag?',
+      contentType: 'CURATED_CORE',
+      contentStatus: 'PUBLISHED',
+      launchPriority: 'P0',
+      /* legacy compat */
       status: 'PUBLISHED',
       estimatedMinutes: 25,
       scenarioFamily: 'community_public',
@@ -73,133 +108,192 @@
 
   /* ═══════════════════════════════════════════════════════════════
      LEVEL  A0  —  Pre-A1 / Foundation
+     Structure:
+       A0-BRIDGE (P0) — 10-lesson Foundation Bridge → entry into A1
+       A0-U1 … A0-U4  (P1) — full standalone foundation course (post-launch)
   ═══════════════════════════════════════════════════════════════ */
   var A0 = {
     code: 'A0',
-    launchPriority: 'P1',
+    launchPriority: 'P0',   /* Level is P0 because the Bridge is P0 */
 
     levelPurpose:
-      'Build absolute zero literacy and spoken-word recognition in English. ' +
-      'Learners arrive with no prior English exposure. Every item is concrete, ' +
-      'visual, and immediately useful. The level removes anxiety and establishes ' +
-      'the habit of noticing English in the world around the learner.',
+      'Prepare absolute beginners (zero prior English) to enter the A1 path. ' +
+      'The A0 Foundation Bridge (10 lessons, P0) covers everything a learner needs ' +
+      'to start A1 confidently: greetings, identity, objects, colours, numbers, ' +
+      '"I am / you are / it is", and a readiness assessment. ' +
+      'The extended standalone A0 course (Units 1–4, P1) provides a deeper ' +
+      'foundation for learners who need more preparation before A1.',
 
     entryExpectations:
-      'No English required. Learner must be able to read their own L1 and ' +
-      'follow simple visual instructions. Basic number recognition (1–10) helpful.',
+      'No English required. Learner must be able to follow simple visual instructions. ' +
+      'Basic number recognition (1–10) in any script is helpful but not required.',
 
     endOfLevelOutcomes: [
-      'Recognise and say the English alphabet aloud.',
-      'Count to 20 and recognise numerals in context.',
-      'Identify and name ~150 high-frequency concrete nouns by sight.',
-      'Understand and respond to 10 core classroom instructions.',
-      'Produce single-word and two-word answers to simple visual prompts.',
-      'Recognise own name and basic personal information in written form.',
-      'Say hello, goodbye, please, thank you, and sorry confidently.',
+      'Introduce yourself in English (name, age, country).',
+      'Greet people and respond to basic questions.',
+      'Identify ~80 high-frequency concrete nouns.',
+      'Use "I am", "you are", and "it is" in short sentences.',
+      'Name colours and numbers 1–20.',
+      'Spell your name aloud using the English alphabet.',
+      'Follow 10 core classroom/platform instructions.',
+      'Ask and answer: What is your name? How old are you? Where are you from?',
+      'Complete a basic personal ID task in English.',
+      'Demonstrate readiness to begin A1.',
     ],
+
+    /* ── A0 FOUNDATION BRIDGE (P0) — 10 lessons ── */
+    foundationBridge: {
+      code: 'A0-BRIDGE',
+      title: 'A0 Foundation Bridge',
+      description:
+        'The essential 10-lesson bridge for absolute beginners. Covers everything ' +
+        'needed to enter the A1 path. All 10 lessons are P0 launch-critical.',
+      launchPriority: 'P0',
+      lessons: [
+        p0('A0-BRG-L1', 'Welcome to LinguaX: Platform & Classroom English', 20, 'education_study',
+          ['imperative_basic', 'greeting_formulaic'],
+          'I can follow platform instructions and understand classroom language.'),
+        p0('A0-BRG-L2', 'Hello and Goodbye: Greetings and Farewells', 20, 'personal_life',
+          ['greeting_formulaic', 'polite_formulaic'],
+          'I can greet people and say goodbye using set phrases.'),
+        p0('A0-BRG-L3', 'What Is Your Name? — Introductions', 20, 'personal_life',
+          ['name_exchange'],
+          'I can give my name and ask someone else their name.'),
+        p0('A0-BRG-L4', 'Where Are You From? — Nationality and Country', 20, 'personal_life',
+          ['country_expression', 'name_exchange'],
+          'I can say where I am from and understand country names.'),
+        p0('A0-BRG-L5', 'How Old Are You? — Age and Numbers 1–20', 20, 'personal_life',
+          ['age_expression', 'cardinal_numbers'],
+          'I can say my age and understand numbers 1–20.'),
+        p0('A0-BRG-L6', 'Familiar Objects: This Is a Bag, a Phone, a Key', 20, 'personal_life',
+          ['noun_singular', 'present_be_is'],
+          'I can identify and name 15 common everyday objects.'),
+        p0('A0-BRG-L7', 'Colours and Descriptions: The Bag Is Black', 20, 'personal_life',
+          ['colour_adjectives', 'present_be_is'],
+          'I can name 8 colours and use them to describe objects.'),
+        p0('A0-BRG-L8', 'I Am, You Are, It Is — My First Sentences', 25, 'personal_life',
+          ['present_be_am', 'present_be_is', 'present_be_are'],
+          'I can use "I am", "you are", and "it is" in simple sentences.'),
+        p0('A0-BRG-L9', 'My Alphabet: Spelling My Name', 20, 'personal_life',
+          ['alphabet_recognition', 'alphabet_spelling'],
+          'I can identify all 26 letters and spell my name aloud.'),
+        p0('A0-BRG-L10', 'Foundation Bridge Assessment: Ready for A1?', 25, 'personal_life',
+          ['name_exchange', 'age_expression', 'country_expression', 'present_be_is', 'colour_adjectives'],
+          'I can complete a short self-introduction and object description to show I am ready for A1.'),
+      ],
+    },
 
     units: [
       {
         code: 'A0-U1',
-        title: 'Hello, English!',
-        description: 'First contact — alphabet, sounds, and classroom language.',
+        title: 'Hello, English! (Extended)',
+        description: 'Post-launch extended unit — alphabet, sounds, and classroom language in depth.',
+        launchPriority: 'P1',
         lessons: [
-          planned('A0-U1-L1', 'The English Alphabet: A–M', 20, 'education_study',
+          p1('A0-U1-L1', 'The English Alphabet: A–M', 20, 'education_study',
             ['alphabet_recognition'], 'I can identify and say letters A to M.'),
-          planned('A0-U1-L2', 'The English Alphabet: N–Z', 20, 'education_study',
+          p1('A0-U1-L2', 'The English Alphabet: N–Z', 20, 'education_study',
             ['alphabet_recognition'], 'I can identify and say letters N to Z.'),
-          planned('A0-U1-L3', 'Classroom Instructions: Stand Up, Sit Down, Listen', 20, 'education_study',
+          p1('A0-U1-L3', 'Classroom Instructions: Stand Up, Sit Down, Listen', 20, 'education_study',
             ['imperative_basic'], 'I can follow 10 core classroom commands.'),
-          planned('A0-U1-L4', 'Hello and Goodbye', 20, 'personal_life',
-            ['greeting_formulaic'], 'I can greet and farewell people using set phrases.'),
-          planned('A0-U1-L5', 'Please, Thank You, Sorry', 15, 'personal_life',
+          p1('A0-U1-L4', 'Hello and Goodbye (Extended Practice)', 20, 'personal_life',
+            ['greeting_formulaic'], 'I can use a wider range of greeting expressions.'),
+          p1('A0-U1-L5', 'Please, Thank You, Sorry — Politeness Formulae', 15, 'personal_life',
             ['polite_formulaic'], 'I can use three essential politeness words correctly.'),
         ],
       },
       {
         code: 'A0-U2',
-        title: 'Numbers and Colours',
-        description: 'Core numbers 1–20 and basic colour vocabulary.',
+        title: 'Numbers and Colours (Extended)',
+        description: 'Post-launch extended unit — numbers 1–20 and full colour vocabulary.',
+        launchPriority: 'P1',
         lessons: [
-          planned('A0-U2-L1', 'Numbers 1–10', 20, 'personal_life',
+          p1('A0-U2-L1', 'Numbers 1–10', 20, 'personal_life',
             ['cardinal_numbers'], 'I can count from 1 to 10 and match numerals to words.'),
-          planned('A0-U2-L2', 'Numbers 11–20', 20, 'personal_life',
+          p1('A0-U2-L2', 'Numbers 11–20', 20, 'personal_life',
             ['cardinal_numbers'], 'I can count from 11 to 20.'),
-          planned('A0-U2-L3', 'Colours: Red, Blue, Green, Yellow, Black, White', 20, 'personal_life',
+          p1('A0-U2-L3', 'Colours: Red, Blue, Green, Yellow, Black, White', 20, 'personal_life',
             ['colour_adjectives'], 'I can name six basic colours.'),
-          planned('A0-U2-L4', 'Colours: Orange, Purple, Pink, Brown, Grey', 20, 'personal_life',
+          p1('A0-U2-L4', 'Colours: Orange, Purple, Pink, Brown, Grey', 20, 'personal_life',
             ['colour_adjectives'], 'I can name five more colours.'),
-          planned('A0-U2-L5', 'Numbers and Colours Together: Three Blue Bags', 20, 'personal_life',
+          p1('A0-U2-L5', 'Numbers and Colours Together: Three Blue Bags', 20, 'personal_life',
             ['cardinal_numbers', 'colour_adjectives'], 'I can combine a number and a colour to describe things.'),
         ],
       },
       {
         code: 'A0-U3',
-        title: 'My World: Things I Can See',
-        description: 'Concrete everyday nouns — body, classroom, home, food.',
+        title: 'My World: Things I Can See (Extended)',
+        description: 'Post-launch extended unit — concrete everyday nouns.',
+        launchPriority: 'P1',
         lessons: [
-          planned('A0-U3-L1', 'My Body: Head, Eyes, Ears, Nose, Mouth, Hands', 20, 'health_wellbeing',
+          p1('A0-U3-L1', 'My Body: Head, Eyes, Ears, Nose, Mouth, Hands', 20, 'health_wellbeing',
             ['body_nouns'], 'I can name six body parts.'),
-          planned('A0-U3-L2', 'My Classroom: Book, Pen, Desk, Chair, Board', 20, 'education_study',
+          p1('A0-U3-L2', 'My Classroom: Book, Pen, Desk, Chair, Board', 20, 'education_study',
             ['classroom_nouns'], 'I can name five classroom objects.'),
-          planned('A0-U3-L3', 'My Home: Door, Window, Table, Chair, Bed', 20, 'personal_life',
+          p1('A0-U3-L3', 'My Home: Door, Window, Table, Chair, Bed', 20, 'personal_life',
             ['home_nouns'], 'I can name five objects found at home.'),
-          planned('A0-U3-L4', 'Food I Know: Apple, Bread, Water, Milk, Egg', 20, 'food_shopping',
+          p1('A0-U3-L4', 'Food I Know: Apple, Bread, Water, Milk, Egg', 20, 'food_shopping',
             ['food_nouns'], 'I can name five basic food items.'),
-          planned('A0-U3-L5', 'Animals: Dog, Cat, Bird, Fish, Horse', 20, 'personal_life',
+          p1('A0-U3-L5', 'Animals: Dog, Cat, Bird, Fish, Horse', 20, 'personal_life',
             ['animal_nouns'], 'I can name five common animals.'),
-          planned('A0-U3-L6', 'Review: Nouns in My World', 20, 'personal_life',
+          p1('A0-U3-L6', 'Review: Nouns in My World', 20, 'personal_life',
             ['noun_review_a0'], 'I can identify 25+ nouns across all topic areas.'),
         ],
       },
       {
         code: 'A0-U4',
-        title: 'Who Am I? Basic Personal Information',
-        description: 'Name, age, country — the first personal information exchange.',
+        title: 'Who Am I? Personal Information (Extended)',
+        description: 'Post-launch extended unit — name, age, country in depth.',
+        launchPriority: 'P1',
         lessons: [
-          planned('A0-U4-L1', 'My Name: What Is Your Name? My Name Is …', 20, 'personal_life',
+          p1('A0-U4-L1', 'My Name: Extended Practice and Written Form', 20, 'personal_life',
             ['name_exchange'], 'I can say and write my own name in English.'),
-          planned('A0-U4-L2', 'My Age: How Old Are You? I Am … Years Old.', 20, 'personal_life',
-            ['age_expression'], 'I can say and understand ages using cardinal numbers.'),
-          planned('A0-U4-L3', 'My Country: Where Are You From? I Am From …', 20, 'personal_life',
-            ['country_expression'], 'I can name my country and at least 5 other countries.'),
-          planned('A0-U4-L4', 'A–Z: My Name, My Spelling', 20, 'personal_life',
-            ['alphabet_spelling'], 'I can spell my name aloud using the English alphabet.'),
-          planned('A0-U4-L5', 'Foundation Challenge: Who Am I? Card', 25, 'personal_life',
+          p1('A0-U4-L2', 'My Age: Numbers in Context', 20, 'personal_life',
+            ['age_expression'], 'I can use ages naturally in conversation.'),
+          p1('A0-U4-L3', 'My Country: Countries and Nationalities', 20, 'personal_life',
+            ['country_expression'], 'I can name my country and at least 10 other countries.'),
+          p1('A0-U4-L4', 'A–Z: Spelling Names and Words', 20, 'personal_life',
+            ['alphabet_spelling'], 'I can spell any short English word aloud.'),
+          p1('A0-U4-L5', 'Foundation Extended Challenge: Full Self-Introduction', 25, 'personal_life',
             ['name_exchange', 'age_expression', 'country_expression'],
-            'I can complete a basic personal ID card in English.'),
+            'I can give a one-minute self-introduction in English.'),
         ],
       },
     ],
 
     grammarProgression: [
-      { order: 1, tag: 'alphabet_recognition',  title: 'The English Alphabet (recognition + production)' },
-      { order: 2, tag: 'cardinal_numbers',       title: 'Cardinal Numbers 1–20' },
-      { order: 3, tag: 'colour_adjectives',      title: 'Colour Adjectives (pre-noun position)' },
-      { order: 4, tag: 'noun_singular',          title: 'Singular Nouns (concrete, high-frequency)' },
-      { order: 5, tag: 'imperative_basic',       title: 'Basic Imperatives: Stand up. Sit down. Listen.' },
-      { order: 6, tag: 'greeting_formulaic',     title: 'Formulaic Greetings: Hello / Hi / Goodbye / Bye' },
-      { order: 7, tag: 'polite_formulaic',       title: 'Polite Formulae: Please / Thank you / Sorry' },
-      { order: 8, tag: 'name_exchange',          title: 'Name Exchange: My name is … / What is your name?' },
-      { order: 9, tag: 'age_expression',         title: 'Age: I am … years old.' },
-      { order: 10, tag: 'country_expression',    title: 'Country of Origin: I am from …' },
+      { order: 1,  tag: 'alphabet_recognition',  title: 'The English Alphabet (recognition + production)' },
+      { order: 2,  tag: 'alphabet_spelling',      title: 'Spelling Aloud: The NATO/English alphabet approach' },
+      { order: 3,  tag: 'cardinal_numbers',       title: 'Cardinal Numbers 1–20' },
+      { order: 4,  tag: 'colour_adjectives',      title: 'Colour Adjectives (pre-noun position)' },
+      { order: 5,  tag: 'noun_singular',          title: 'Singular Nouns (concrete, high-frequency)' },
+      { order: 6,  tag: 'imperative_basic',       title: 'Basic Imperatives: Stand up. Sit down. Listen.' },
+      { order: 7,  tag: 'greeting_formulaic',     title: 'Formulaic Greetings: Hello / Hi / Goodbye / Bye' },
+      { order: 8,  tag: 'polite_formulaic',       title: 'Polite Formulae: Please / Thank you / Sorry' },
+      { order: 9,  tag: 'name_exchange',          title: 'Name Exchange: My name is … / What is your name?' },
+      { order: 10, tag: 'age_expression',         title: 'Age: I am … years old.' },
+      { order: 11, tag: 'country_expression',     title: 'Country of Origin: I am from …' },
+      { order: 12, tag: 'present_be_am',          title: 'To Be: I am … (first-person singular)' },
+      { order: 13, tag: 'present_be_is',          title: 'To Be: it is … (third-person singular)' },
+      { order: 14, tag: 'present_be_are',         title: 'To Be: you are … (second-person, entry only)' },
     ],
 
     vocabularyThemes: [
-      'Alphabet and phonics', 'Numbers 1–20', 'Colours (11)',
-      'Classroom objects', 'Body parts', 'Home objects',
-      'Food basics', 'Animals', 'Countries and nationalities (10)',
-      'Personal information words',
+      'Alphabet and phonics', 'Numbers 1–20', 'Colours (8 in bridge, 11 in extended)',
+      'Classroom objects', 'Personal belongings (bag, phone, key, book)',
+      'Body parts', 'Home objects', 'Food basics', 'Animals',
+      'Countries and nationalities (10+)', 'Personal information words',
     ],
 
     languageFunctions: [
       'Greeting and leave-taking',
       'Expressing politeness (please / thank you / sorry)',
-      'Identifying objects by name',
+      'Identifying and describing familiar objects',
       'Saying your name, age, and country',
       'Spelling your name aloud',
-      'Following basic classroom instructions',
-      'Recognising numbers in context (prices, ages, phone numbers)',
+      'Following basic classroom/platform instructions',
+      'Asking and answering simple identity questions',
+      'Making simple statements with "I am / it is / you are"',
     ],
 
     scenarioFamilies: [
@@ -207,21 +301,26 @@
     ],
 
     assessmentCheckpoints: [
-      { after: 'A0-U2', type: 'formative', label: 'Numbers & Colours Check', description: 'Match 20 number words to numerals; name all 11 colours from flashcards.' },
-      { after: 'A0-U3', type: 'formative', label: 'Noun Recognition Scan', description: 'Identify 25 nouns from images within 60 seconds.' },
-      { after: 'A0-U4', type: 'summative', label: 'Foundation Exit Task', description: 'Complete a personal ID card (name, age, country, spell name). Score ≥ 80% to exit A0.' },
+      { after: 'A0-BRG-L5',  type: 'formative', label: 'Bridge Mid-Check: Identity',
+        description: 'Say name, age, country. Ask the same of a partner. Identify 10 objects.' },
+      { after: 'A0-BRG-L10', type: 'summative', label: 'Foundation Bridge Exit',
+        description: 'Self-introduction (name, age, country, describe 3 objects). Score ≥ 80% to progress to A1.' },
+      { after: 'A0-U3', type: 'formative', label: 'Extended Noun Scan',
+        description: '(Post-launch) Identify 25 nouns from images within 60 seconds.' },
+      { after: 'A0-U4', type: 'summative', label: 'Extended Foundation Exit',
+        description: '(Post-launch) Full personal ID card + 1-minute self-introduction.' },
     ],
 
     reviewStrategy:
-      'Daily 5-minute flashcard loops on target nouns and numbers. ' +
-      'Spaced repetition intervals: 1 day → 3 days → 7 days. ' +
-      'No written production required — recognition and spoken matching only.',
+      'Bridge: daily 5-minute word recognition loops. ' +
+      'Spaced repetition: 1 day → 3 days → 7 days. ' +
+      'No written production required at Bridge level — recognition, matching, and short spoken output only.',
 
     finalChallenge:
-      'Foundation Identity Card Task: The learner fills in a printed or on-screen ' +
-      'personal ID card (name, age, country, 3 favourite things using colour + noun), ' +
-      'spells their name aloud, and presents it to a partner or camera. ' +
-      'Rubric: accuracy of spelling, correct number use, colour accuracy, politeness formula.',
+      'Foundation Bridge Assessment (Lesson 10): The learner introduces themselves ' +
+      '(name, age, country), describes 3 objects using colour + noun + "it is", ' +
+      'spells their name aloud, and asks the teacher/partner the same questions. ' +
+      'Passing (≥ 80%) unlocks A1.',
   };
 
   /* ═══════════════════════════════════════════════════════════════
@@ -709,33 +808,25 @@
       'Assessed on grammatical range, accuracy, cohesion, and fluency.',
   };
 
-  window.LX = window.LX || {};
-
-  function planned(id, title, estimatedMinutes, scenarioFamily, grammarFocus, objective) {
-    return {
-      id: id,
-      title: title,
-      status: 'PLANNED',
-      estimatedMinutes: estimatedMinutes || 30,
-      scenarioFamily: scenarioFamily || 'work_business',
-      grammarFocus: grammarFocus || [],
-      objective: objective || '',
-    };
-  }
-
   /* ═══════════════════════════════════════════════════════════════
      LEVEL  B1  —  Intermediate
+     Priority: P0
+     Structure:
+       B1-GEN-U1 … B1-GEN-U4  (P0) — B1 General English (everyday communication)
+       B1-PRO-U1 … B1-PRO-U3  (P0) — B1 Professional / Travel / Workplace
+       B1-EXP-U1 … B1-EXP-U2  (P1) — B1 Expansion (post-launch)
   ═══════════════════════════════════════════════════════════════ */
   var B1 = {
     code: 'B1',
-    launchPriority: 'P1',
+    launchPriority: 'P0',
 
     levelPurpose:
       'Bridge the learner from controlled transactions to genuine independent ' +
-      'communication. B1 learners begin to express opinion, give reasons, narrate ' +
-      'complex events, understand the main point of extended listening and reading, ' +
-      'and handle most predictable travel, work, and social situations without ' +
-      'preparation.',
+      'communication. B1 covers both everyday general English (daily routines, ' +
+      'past experiences, future plans, social communication, opinions) and targeted ' +
+      'professional/travel/workplace English (meetings, travel problems, customer ' +
+      'service, giving updates, recommendations). B1 learners handle most predictable ' +
+      'social and work situations without preparation.',
 
     entryExpectations:
       'Secure A2 exit: past simple (regular + 30 irregular), going to / will, ' +
@@ -747,175 +838,289 @@
       'Use past continuous for background/interrupted actions.',
       'Use first conditional for real/likely situations.',
       'Express opinions, agreement, disagreement, and preferences with reasons.',
-      'Write a structured paragraph or short essay (100–150 words).',
+      'Write a structured paragraph or short email (100–150 words).',
       'Understand the main points of authentic texts on familiar topics.',
       'Handle unexpected problems in travel, work, and daily life.',
       'Use relative clauses to give extra information.',
-      'Use a range of time clauses (when, while, before, after, until).',
+      'Discuss health, lifestyle, and wellbeing.',
       'Use reported speech for simple statements and questions.',
+      'Handle workplace routines, meetings, and professional requests.',
+      'Manage travel problems and customer service interactions.',
     ],
 
     units: [
+      /* ── B1 GENERAL ENGLISH (P0) ── */
       {
-        code: 'B1-U1',
+        code: 'B1-GEN-U1',
         title: 'Experience and News: Present Perfect',
+        pathType: 'GENERAL',
+        launchPriority: 'P0',
         description: 'Present perfect for life experiences, recent events, and results; ever, never, just, already, yet.',
         lessons: [
-          planned('B1-U1-L1', 'I Have Been To … — Present Perfect for Experience', 30, 'travel_transport',
+          p0('B1-GEN-U1-L1', 'I Have Been To … — Present Perfect for Experience', 30, 'travel_transport',
             ['present_perfect_experience'], 'I can talk about life experiences using present perfect.'),
-          planned('B1-U1-L2', 'Just, Already, Yet — Recent Events', 30, 'personal_life',
+          p0('B1-GEN-U1-L2', 'Just, Already, Yet — Recent Events', 30, 'personal_life',
             ['present_perfect_just_already_yet'], 'I can use just, already, and yet with present perfect.'),
-          planned('B1-U1-L3', 'Since and For — Duration to the Present', 30, 'work_business',
+          p0('B1-GEN-U1-L3', 'Since and For — Duration to the Present', 30, 'personal_life',
             ['present_perfect_since_for'], 'I can describe how long a situation has lasted using since/for.'),
-          planned('B1-U1-L4', 'Present Perfect vs Past Simple', 30, 'personal_life',
+          p0('B1-GEN-U1-L4', 'Present Perfect vs Past Simple', 30, 'personal_life',
             ['present_perfect_vs_past_simple'], 'I can choose correctly between present perfect and past simple.'),
-          planned('B1-U1-L5', 'In the News — Present Perfect in Real Contexts', 30, 'community_public',
+          p0('B1-GEN-U1-L5', 'In the News — Present Perfect in Real Contexts', 30, 'community_public',
             ['present_perfect_experience', 'present_perfect_just_already_yet'],
             'I can discuss news headlines using present perfect naturally.'),
-          planned('B1-U1-L6', 'Have You Finished? — Present Perfect in Workplace Talk', 30, 'work_business',
-            ['present_perfect_since_for', 'present_perfect_just_already_yet'],
-            'I can ask and answer about task completion in a workplace context.'),
+          p0('B1-GEN-U1-L6', 'My Experiences: Telling Your Story', 30, 'personal_life',
+            ['present_perfect_experience', 'present_perfect_vs_past_simple'],
+            'I can talk about significant life experiences, mixing present perfect and past simple.'),
         ],
       },
       {
-        code: 'B1-U2',
-        title: 'Telling Stories: Past Continuous and Narrative',
+        code: 'B1-GEN-U2',
+        title: 'Telling Stories: Narrative Tenses',
+        pathType: 'GENERAL',
+        launchPriority: 'P0',
         description: 'Past continuous for background and interrupted action; narrative tenses combined.',
         lessons: [
-          planned('B1-U2-L1', 'I Was Walking When … — Past Continuous', 30, 'personal_life',
+          p0('B1-GEN-U2-L1', 'I Was Walking When … — Past Continuous', 30, 'personal_life',
             ['past_continuous'], 'I can describe a background action using past continuous.'),
-          planned('B1-U2-L2', 'When vs While — Interrupted Actions', 30, 'personal_life',
+          p0('B1-GEN-U2-L2', 'When vs While — Interrupted Actions', 30, 'personal_life',
             ['past_continuous', 'past_simple_irregular_group1'],
             'I can contrast when (sudden event) and while (ongoing action).'),
-          planned('B1-U2-L3', 'A Dramatic Story: Past Simple + Past Continuous', 30, 'personal_life',
+          p0('B1-GEN-U2-L3', 'A Dramatic Story: Past Simple + Past Continuous', 30, 'personal_life',
             ['past_continuous', 'past_simple_irregular_group1'],
             'I can tell a dramatic story combining both narrative tenses.'),
-          planned('B1-U2-L4', 'Had Already … — Introduction to Past Perfect', 30, 'personal_life',
+          p0('B1-GEN-U2-L4', 'Had Already … — Introduction to Past Perfect', 30, 'personal_life',
             ['past_perfect_intro'], 'I can use past perfect to show one past action preceded another.'),
-          planned('B1-U2-L5', 'True Stories: Reading and Retelling', 30, 'personal_life',
+          p0('B1-GEN-U2-L5', 'True Stories: Reading and Retelling', 30, 'personal_life',
             ['past_continuous', 'past_perfect_intro', 'time_connectors'],
             'I can read and retell a short news story using narrative tenses.'),
         ],
       },
       {
-        code: 'B1-U3',
-        title: 'If … Then: Conditionals',
-        description: 'Zero conditional for facts; first conditional for real/likely futures.',
+        code: 'B1-GEN-U3',
+        title: 'Opinions, Discussion, and Social Communication',
+        pathType: 'GENERAL',
+        launchPriority: 'P0',
+        description: 'Expressing and justifying opinions, agreeing and disagreeing, discussing topics with friends.',
         lessons: [
-          planned('B1-U3-L1', 'If You Heat Water … — Zero Conditional', 30, 'education_study',
-            ['zero_conditional'], 'I can use zero conditional for facts and general truths.'),
-          planned('B1-U3-L2', 'If I Study Hard, I Will Pass — First Conditional', 30, 'education_study',
-            ['first_conditional'], 'I can make first conditional sentences for likely outcomes.'),
-          planned('B1-U3-L3', 'Unless, As Long As — Conditional Variations', 30, 'work_business',
-            ['conditional_unless'], 'I can use "unless" and "as long as" in conditional sentences.'),
-          planned('B1-U3-L4', 'Warning Signs and Instructions — Conditionals in Context', 30, 'community_public',
-            ['zero_conditional', 'first_conditional'],
-            'I can read and write warning notices using conditional language.'),
-          planned('B1-U3-L5', 'Problem-Solving: What Will Happen If …?', 30, 'work_business',
-            ['first_conditional', 'conditional_unless'],
-            'I can discuss a workplace problem using conditional reasoning.'),
-        ],
-      },
-      {
-        code: 'B1-U4',
-        title: 'Opinions and Discussion',
-        description: 'Expressing and justifying opinions, agreeing and disagreeing, discussing pros and cons.',
-        lessons: [
-          planned('B1-U4-L1', 'I Think … I Believe … — Giving Opinions', 30, 'community_public',
+          p0('B1-GEN-U3-L1', 'I Think … I Believe … — Giving Opinions', 30, 'community_public',
             ['opinion_phrases'], 'I can give my opinion on familiar topics using opinion phrases.'),
-          planned('B1-U4-L2', 'I Agree / I Disagree — Arguing a Point', 30, 'community_public',
+          p0('B1-GEN-U3-L2', 'I Agree / I Disagree — Arguing a Point', 30, 'community_public',
             ['agreement_disagreement'], 'I can agree and disagree politely and give reasons.'),
-          planned('B1-U4-L3', 'On the One Hand … — Balanced Arguments', 30, 'education_study',
+          p0('B1-GEN-U3-L3', 'On the One Hand … — Balanced Arguments', 30, 'education_study',
             ['contrast_connectors'], 'I can present both sides of an argument.'),
-          planned('B1-U4-L4', 'Because, So, Although — Adding Reasons and Contrast', 30, 'personal_life',
+          p0('B1-GEN-U3-L4', 'Because, So, Although — Adding Reasons and Contrast', 30, 'personal_life',
             ['reason_result_contrast'], 'I can use because, so, and although to connect ideas.'),
-          planned('B1-U4-L5', 'A Discussion: Is Technology Good for Us?', 30, 'technology_services',
+          p0('B1-GEN-U3-L5', 'Health and Lifestyle: Habits and Choices', 30, 'health_wellbeing',
+            ['present_simple_affirmative', 'modal_should_advice', 'opinion_phrases'],
+            'I can discuss health habits and give or respond to advice.'),
+          p0('B1-GEN-U3-L6', 'A Discussion: What Do You Think About …?', 30, 'community_public',
             ['opinion_phrases', 'agreement_disagreement', 'contrast_connectors'],
-            'I can take part in a structured discussion on a familiar topic.'),
+            'I can take part in a social discussion on a familiar topic.'),
         ],
       },
       {
-        code: 'B1-U5',
-        title: 'Giving Information: Relative Clauses',
-        description: 'Defining relative clauses with who, which, that, where.',
+        code: 'B1-GEN-U4',
+        title: 'Everyday Problems and Solutions',
+        pathType: 'GENERAL',
+        launchPriority: 'P0',
+        description: 'Conditionals for problem-solving; relative clauses for clear explanations; everyday situations.',
         lessons: [
-          planned('B1-U5-L1', 'The Person Who … — Relative Clauses with "who"', 30, 'personal_life',
-            ['relative_clause_who'], 'I can use who to define a person.'),
-          planned('B1-U5-L2', 'The Thing That … — Relative Clauses with "which/that"', 30, 'personal_life',
-            ['relative_clause_which'], 'I can use which/that to define a thing.'),
-          planned('B1-U5-L3', 'The Place Where … — Relative Clauses with "where"', 30, 'city_directions',
-            ['relative_clause_where'], 'I can use where to define a place.'),
-          planned('B1-U5-L4', 'Defining vs Non-Defining: Extra Information', 30, 'education_study',
-            ['non_defining_relative_clause'], 'I can add non-essential information using commas + relative clauses.'),
-          planned('B1-U5-L5', 'Writing a Description Using Relative Clauses', 30, 'personal_life',
+          p0('B1-GEN-U4-L1', 'If You Heat Water … — Zero Conditional', 30, 'education_study',
+            ['zero_conditional'], 'I can use zero conditional for facts and general truths.'),
+          p0('B1-GEN-U4-L2', 'If I Study Hard, I Will Pass — First Conditional', 30, 'education_study',
+            ['first_conditional'], 'I can make first conditional sentences for likely outcomes.'),
+          p0('B1-GEN-U4-L3', 'The Person Who … — Relative Clauses', 30, 'personal_life',
             ['relative_clause_who', 'relative_clause_which', 'relative_clause_where'],
-            'I can write a clear description of a person, thing, or place.'),
+            'I can use relative clauses to give essential information about people, things, and places.'),
+          p0('B1-GEN-U4-L4', 'Solving a Problem: Step by Step', 30, 'community_public',
+            ['first_conditional', 'relative_clause_who', 'reason_result_contrast'],
+            'I can explain a problem and propose a solution clearly.'),
+          p0('B1-GEN-U4-L5', 'B1 General Exit Challenge: A Real-Life Situation', 35, 'personal_life',
+            ['present_perfect_experience', 'past_continuous', 'first_conditional', 'opinion_phrases'],
+            'I can handle a complex everyday situation drawing on all B1 General grammar targets.'),
+        ],
+      },
+
+      /* ── B1 PROFESSIONAL / TRAVEL / WORKPLACE (P0) ── */
+      {
+        code: 'B1-PRO-U1',
+        title: 'Workplace Routines and Communication',
+        pathType: 'PROFESSIONAL',
+        launchPriority: 'P0',
+        description: 'Meetings, appointments, giving updates, asking for clarification.',
+        lessons: [
+          p0('B1-PRO-U1-L1', 'Have You Finished? — Workplace Present Perfect', 30, 'work_business',
+            ['present_perfect_since_for', 'present_perfect_just_already_yet'],
+            'I can ask and answer about task completion in a workplace context.'),
+          p0('B1-PRO-U1-L2', 'Meetings and Appointments: Arranging and Confirming', 30, 'work_business',
+            ['going_to_future', 'modal_could_polite'],
+            'I can arrange, confirm, and reschedule a meeting or appointment.'),
+          p0('B1-PRO-U1-L3', 'He Said (That) … — Reported Speech in the Office', 30, 'work_business',
+            ['reported_speech_statements', 'reported_speech_questions'],
+            'I can pass on instructions and information accurately using reported speech.'),
+          p0('B1-PRO-U1-L4', 'Could You Clarify That? — Asking for Clarification', 30, 'work_business',
+            ['modal_could_polite', 'clarification_phrases'],
+            'I can politely ask for clarification and check understanding.'),
+          p0('B1-PRO-U1-L5', 'Giving an Update: What Has Happened So Far', 30, 'work_business',
+            ['present_perfect_just_already_yet', 'present_perfect_since_for'],
+            'I can give a clear spoken update on the progress of a task or project.'),
         ],
       },
       {
-        code: 'B1-U6',
-        title: 'Reporting What Was Said',
-        description: 'Reported speech for statements, questions, and requests; backshift rules.',
+        code: 'B1-PRO-U2',
+        title: 'Travel Problems and Customer Service',
+        pathType: 'PROFESSIONAL',
+        launchPriority: 'P0',
+        description: 'Handling travel disruptions, complaints, and customer service interactions.',
         lessons: [
-          planned('B1-U6-L1', 'He Said (That) … — Reported Statements', 30, 'work_business',
-            ['reported_speech_statements'], 'I can report what someone said using backshift.'),
-          planned('B1-U6-L2', 'She Asked If … — Reported Questions', 30, 'work_business',
-            ['reported_speech_questions'], 'I can report yes/no and Wh- questions.'),
-          planned('B1-U6-L3', 'He Told Me To … — Reported Commands', 30, 'work_business',
+          p0('B1-PRO-U2-L1', 'My Flight Was Cancelled — Travel Problems', 30, 'travel_transport',
+            ['past_be_was_were', 'past_simple_irregular_group1'],
+            'I can explain a travel problem clearly and ask for help.'),
+          p0('B1-PRO-U2-L2', 'I\'d Like to Make a Complaint — Customer Service', 30, 'community_public',
+            ['modal_could_polite', 'reported_speech_statements'],
+            'I can make a polite but firm complaint and request a resolution.'),
+          p0('B1-PRO-U2-L3', 'Unless There Is a Delay … — Conditionals in Travel Context', 30, 'travel_transport',
+            ['first_conditional', 'conditional_unless'],
+            'I can discuss travel contingencies using conditional language.'),
+          p0('B1-PRO-U2-L4', 'Making Recommendations: The Best Option Is …', 30, 'work_business',
+            ['comparative_adjectives_short', 'comparative_adjectives_long', 'modal_should_advice'],
+            'I can compare options and make a clear recommendation.'),
+          p0('B1-PRO-U2-L5', 'Agreeing on Next Steps: Follow-Up Communication', 30, 'work_business',
+            ['going_to_future', 'first_conditional', 'reported_speech_statements'],
+            'I can confirm what was agreed and outline the next steps.'),
+        ],
+      },
+      {
+        code: 'B1-PRO-U3',
+        title: 'Explaining and Presenting at Work',
+        pathType: 'PROFESSIONAL',
+        launchPriority: 'P0',
+        description: 'Explaining a problem, presenting information, using professional writing.',
+        lessons: [
+          p0('B1-PRO-U3-L1', 'The Problem Was … — Explaining a Situation', 30, 'work_business',
+            ['past_continuous', 'past_perfect_intro', 'reason_result_contrast'],
+            'I can explain a complex situation using narrative and linking language.'),
+          p0('B1-PRO-U3-L2', 'The Person Who Handles This … — Relative Clauses at Work', 30, 'work_business',
+            ['relative_clause_who', 'relative_clause_which'],
+            'I can identify people and things at work using relative clauses.'),
+          p0('B1-PRO-U3-L3', 'A Short Report: Findings and Next Steps', 30, 'work_business',
+            ['present_perfect_just_already_yet', 'going_to_future', 'reason_result_contrast'],
+            'I can write a short professional summary of events and proposed actions.'),
+          p0('B1-PRO-U3-L4', 'Comparing Options: Which Is Better for the Team?', 30, 'work_business',
+            ['comparative_adjectives_short', 'comparative_adjectives_long', 'opinion_phrases'],
+            'I can present and discuss options, giving a justified recommendation.'),
+          p0('B1-PRO-U3-L5', 'B1 Professional Exit Challenge: Solve a Problem at Work', 35, 'work_business',
+            ['present_perfect_since_for', 'first_conditional', 'reported_speech_statements', 'relative_clause_who'],
+            'I can handle a complex workplace interaction drawing on all B1 Professional grammar targets.'),
+        ],
+      },
+
+      /* ── B1 EXPANSION (P1 — post-launch) ── */
+      {
+        code: 'B1-EXP-U1',
+        title: 'Advanced Reporting and Relative Clauses (Expansion)',
+        pathType: 'EXPANSION',
+        launchPriority: 'P1',
+        description: 'Post-launch expansion: non-defining relative clauses, advanced reported speech.',
+        lessons: [
+          p1('B1-EXP-U1-L1', 'Defining vs Non-Defining: Extra Information', 30, 'education_study',
+            ['non_defining_relative_clause'], 'I can add non-essential information using commas + relative clauses.'),
+          p1('B1-EXP-U1-L2', 'She Told Me To … — Reported Commands', 30, 'work_business',
             ['reported_speech_commands'], 'I can report instructions and commands.'),
-          planned('B1-U6-L4', 'Gossip and News — Reported Speech in Social Contexts', 30, 'community_public',
+          p1('B1-EXP-U1-L3', 'Gossip and News — Reported Speech in Social Contexts', 30, 'community_public',
             ['reported_speech_statements', 'reported_speech_questions'],
             'I can pass on news or gossip accurately using reported speech.'),
-          planned('B1-U6-L5', 'B1 Exit Challenge: Solve a Problem at Work', 35, 'work_business',
-            ['present_perfect_since_for', 'first_conditional', 'reported_speech_statements', 'relative_clause_who'],
-            'I can handle a complex workplace interaction drawing on all B1 grammar targets.'),
+          p1('B1-EXP-U1-L4', 'Writing a Description Using Relative Clauses', 30, 'personal_life',
+            ['relative_clause_who', 'relative_clause_which', 'relative_clause_where'],
+            'I can write a clear description of a person, thing, or place.'),
+          p1('B1-EXP-U1-L5', 'Unless, As Long As — Conditional Variations', 30, 'work_business',
+            ['conditional_unless'], 'I can use "unless" and "as long as" in conditional sentences.'),
+        ],
+      },
+      {
+        code: 'B1-EXP-U2',
+        title: 'Environmental and Social Topics (Expansion)',
+        pathType: 'EXPANSION',
+        launchPriority: 'P1',
+        description: 'Post-launch expansion: discussing broader social and environmental issues at B1.',
+        lessons: [
+          p1('B1-EXP-U2-L1', 'Is Technology Good for Us? — A Discussion', 30, 'technology_services',
+            ['opinion_phrases', 'agreement_disagreement', 'contrast_connectors'],
+            'I can discuss the pros and cons of technology in everyday life.'),
+          p1('B1-EXP-U2-L2', 'The Environment: Problems and Solutions', 30, 'community_public',
+            ['first_conditional', 'reason_result_contrast'],
+            'I can discuss environmental problems and propose solutions.'),
+          p1('B1-EXP-U2-L3', 'Work-Life Balance: Opinions and Advice', 30, 'work_business',
+            ['modal_should_advice', 'opinion_phrases', 'contrast_connectors'],
+            'I can discuss work-life balance and give balanced advice.'),
+          p1('B1-EXP-U2-L4', 'Warning Signs and Public Notices — Conditionals in Context', 30, 'community_public',
+            ['zero_conditional', 'first_conditional'],
+            'I can read and write warning notices using conditional language.'),
+          p1('B1-EXP-U2-L5', 'B1 Expansion Exit: A Structured Opinion Essay', 35, 'education_study',
+            ['opinion_phrases', 'contrast_connectors', 'reason_result_contrast', 'first_conditional'],
+            'I can write a 120-word opinion paragraph on a social topic with a clear argument.'),
         ],
       },
     ],
 
     grammarProgression: [
+      /* General path */
       { order: 1,  tag: 'present_perfect_experience',       title: 'Present Perfect: Experience (ever/never)' },
       { order: 2,  tag: 'present_perfect_just_already_yet', title: 'Present Perfect: Just / Already / Yet' },
       { order: 3,  tag: 'present_perfect_since_for',        title: 'Present Perfect: Since / For (duration)' },
       { order: 4,  tag: 'present_perfect_vs_past_simple',   title: 'Present Perfect vs Past Simple: Contrast' },
       { order: 5,  tag: 'past_continuous',                  title: 'Past Continuous: I was -ing' },
       { order: 6,  tag: 'past_perfect_intro',               title: 'Past Perfect Introduction: had + past participle' },
-      { order: 7,  tag: 'zero_conditional',                 title: 'Zero Conditional: If + present, present' },
-      { order: 8,  tag: 'first_conditional',                title: 'First Conditional: If + present, will' },
-      { order: 9,  tag: 'conditional_unless',               title: 'Conditional Variations: unless, as long as' },
-      { order: 10, tag: 'opinion_phrases',                  title: 'Opinion Language: I think, I believe, In my view' },
-      { order: 11, tag: 'agreement_disagreement',           title: 'Agreeing and Disagreeing: I agree / I\'m not sure about that' },
-      { order: 12, tag: 'contrast_connectors',              title: 'Contrast Connectors: however, on the other hand, although' },
-      { order: 13, tag: 'reason_result_contrast',           title: 'Linking: because, so, although' },
-      { order: 14, tag: 'relative_clause_who',              title: 'Relative Clauses: who (people)' },
-      { order: 15, tag: 'relative_clause_which',            title: 'Relative Clauses: which/that (things)' },
-      { order: 16, tag: 'relative_clause_where',            title: 'Relative Clauses: where (places)' },
-      { order: 17, tag: 'non_defining_relative_clause',     title: 'Non-Defining Relative Clauses (commas)' },
-      { order: 18, tag: 'reported_speech_statements',       title: 'Reported Speech: Statements + backshift' },
-      { order: 19, tag: 'reported_speech_questions',        title: 'Reported Speech: Questions (if/whether + backshift)' },
-      { order: 20, tag: 'reported_speech_commands',         title: 'Reported Speech: Commands (tell + to-inf)' },
+      { order: 7,  tag: 'opinion_phrases',                  title: 'Opinion Language: I think, I believe, In my view' },
+      { order: 8,  tag: 'agreement_disagreement',           title: 'Agreeing and Disagreeing: I agree / I\'m not sure about that' },
+      { order: 9,  tag: 'contrast_connectors',              title: 'Contrast Connectors: however, on the other hand, although' },
+      { order: 10, tag: 'reason_result_contrast',           title: 'Linking: because, so, although' },
+      { order: 11, tag: 'zero_conditional',                 title: 'Zero Conditional: If + present, present' },
+      { order: 12, tag: 'first_conditional',                title: 'First Conditional: If + present, will' },
+      { order: 13, tag: 'relative_clause_who',              title: 'Relative Clauses: who (people)' },
+      { order: 14, tag: 'relative_clause_which',            title: 'Relative Clauses: which/that (things)' },
+      { order: 15, tag: 'relative_clause_where',            title: 'Relative Clauses: where (places)' },
+      /* Professional path (additional) */
+      { order: 16, tag: 'reported_speech_statements',       title: 'Reported Speech: Statements + backshift' },
+      { order: 17, tag: 'reported_speech_questions',        title: 'Reported Speech: Questions (if/whether + backshift)' },
+      { order: 18, tag: 'clarification_phrases',            title: 'Clarification: Could you clarify / What do you mean by …?' },
+      { order: 19, tag: 'conditional_unless',               title: 'Conditional Variations: unless, as long as' },
+      /* Expansion only */
+      { order: 20, tag: 'non_defining_relative_clause',     title: 'Non-Defining Relative Clauses (commas)' },
+      { order: 21, tag: 'reported_speech_commands',         title: 'Reported Speech: Commands (tell + to-inf)' },
     ],
 
     vocabularyThemes: [
-      'News and media vocabulary', 'Travel experiences',
-      'Work processes and tasks', 'Problem and solution language',
-      'Argument and discussion phrases', 'Opinion markers',
-      'Connectors and discourse markers',
-      'Technology (social media, devices)', 'Health and lifestyle',
-      'Education and achievement', 'Environmental topics (entry)',
+      /* General */
+      'News and media vocabulary', 'Personal experiences and travel',
+      'Opinion and discussion phrases', 'Connectors and discourse markers',
+      'Health and lifestyle vocabulary', 'Problem and solution language',
+      /* Professional */
+      'Workplace language: meetings, updates, clarification',
+      'Customer service and complaint language', 'Travel disruption vocabulary',
+      'Professional writing: summaries and recommendations',
+      /* Shared */
+      'Technology and society (social media, devices)',
+      'Environmental and social topics (entry)',
     ],
 
     languageFunctions: [
+      /* General */
       'Narrating complex past events with background and main action',
       'Discussing and comparing life experiences',
-      'Making and responding to conditional proposals',
       'Expressing, justifying, and defending opinions',
       'Agreeing and disagreeing politely',
       'Presenting two sides of an argument',
-      'Describing people, things, and places with relative clauses',
-      'Reporting conversations and news accurately',
-      'Writing a structured paragraph with a clear topic sentence',
-      'Handling unexpected workplace or travel problems',
+      'Making and responding to conditional proposals',
+      /* Professional */
+      'Arranging, confirming, and rescheduling meetings',
+      'Giving updates on tasks and projects',
+      'Asking for and giving clarification',
+      'Making and responding to complaints',
+      'Making recommendations and comparing options',
+      'Writing short professional summaries',
+      'Handling travel problems and disruptions',
+      'Reporting conversations accurately',
     ],
 
     scenarioFamilies: [
@@ -924,25 +1129,29 @@
     ],
 
     assessmentCheckpoints: [
-      { after: 'B1-U2', type: 'formative', label: 'Narrative Tenses Check',
+      { after: 'B1-GEN-U2', type: 'formative', label: 'Narrative Tenses Check',
         description: 'Retell a short news story using past simple + past continuous. Minimum 8 sentences.' },
-      { after: 'B1-U4', type: 'formative', label: 'Discussion Task',
+      { after: 'B1-GEN-U3', type: 'formative', label: 'Discussion Task',
         description: '3-minute discussion: give opinion, justify, respond to counterargument. Assessed on fluency and accuracy.' },
-      { after: 'B1-U6', type: 'summative', label: 'B1 Exit: Workplace Problem',
-        description: 'Role-play: handle a complaint, explain a situation, propose a solution. Score ≥ 80% to exit B1.' },
+      { after: 'B1-GEN-U4', type: 'summative', label: 'B1 General Exit',
+        description: 'Role-play a real-life situation drawing on all B1 General targets. Score ≥ 80%.' },
+      { after: 'B1-PRO-U2', type: 'formative', label: 'Travel/Customer Service Role-Play',
+        description: 'Handle a travel disruption: explain the problem, make a complaint, agree next steps.' },
+      { after: 'B1-PRO-U3', type: 'summative', label: 'B1 Professional Exit: Workplace Problem',
+        description: 'Role-play: handle a complaint, explain a situation, propose a solution. Score ≥ 80% to exit B1 Professional.' },
     ],
 
     reviewStrategy:
       'Present perfect recycled in every subsequent unit via news-based warm-ups. ' +
-      'Reported speech revisited in B1-U6 after appearing in reading texts in U4/U5. ' +
+      'Reported speech revisited in Professional U1 after appearing in General narrative units. ' +
       'Spaced review: 2 days → 7 days → 21 days → 60 days. ' +
       'Writing tasks recycled as speaking prompts in subsequent units.',
 
     finalChallenge:
-      'B1 Workplace Problem: A three-part role-play where the learner (1) reports ' +
+      'B1 Professional Exit: A three-part role-play where the learner (1) reports ' +
       'a complaint using reported speech, (2) explains what has happened using present ' +
       'perfect and narrative tenses, and (3) proposes a solution using first conditional. ' +
-      'A written follow-up email (100 words) must be submitted. ' +
+      'A written follow-up summary (100 words) must be submitted. ' +
       'Assessed on range, accuracy, coherence, and register.',
   };
 
@@ -1210,19 +1419,19 @@
         title: 'Advanced Grammar: Subjunctive, Inversion, Ellipsis',
         description: 'Formal and literary grammar structures for advanced writing and speech.',
         lessons: [
-          planned('C1-U1-L1', 'It Is Essential That He Be … — The Subjunctive', 35, 'education_study',
+          p2('C1-U1-L1', 'It Is Essential That He Be … — The Subjunctive', 35, 'education_study',
             ['subjunctive_formal'],
             'I can use the formal subjunctive in recommendations and requirements.'),
-          planned('C1-U1-L2', 'Not Only Did He … — Advanced Inversion', 35, 'education_study',
+          p2('C1-U1-L2', 'Not Only Did He … — Advanced Inversion', 35, 'education_study',
             ['inversion_advanced'],
             'I can use a range of inverted structures for emphasis and formality.'),
-          planned('C1-U1-L3', 'She Can, and So Can I — Ellipsis and Substitution', 35, 'personal_life',
+          p2('C1-U1-L3', 'She Can, and So Can I — Ellipsis and Substitution', 35, 'personal_life',
             ['ellipsis_substitution'],
             'I can avoid repetition using ellipsis, so, do so, and one(s).'),
-          planned('C1-U1-L4', 'Nominalisation: Turning Verbs into Nouns', 35, 'work_business',
+          p2('C1-U1-L4', 'Nominalisation: Turning Verbs into Nouns', 35, 'work_business',
             ['nominalisation'],
             'I can use nominalisation to create formal, concise academic prose.'),
-          planned('C1-U1-L5', 'Complex Sentences in Academic Writing', 35, 'education_study',
+          p2('C1-U1-L5', 'Complex Sentences in Academic Writing', 35, 'education_study',
             ['subjunctive_formal', 'nominalisation', 'ellipsis_substitution'],
             'I can apply advanced grammar in a paragraph of academic writing.'),
         ],
@@ -1232,17 +1441,17 @@
         title: 'Idioms, Collocation, and Lexical Precision',
         description: 'High-frequency idioms, multi-word verbs, and fine-grained word choice.',
         lessons: [
-          planned('C1-U2-L1', 'At the Drop of a Hat — Idioms of Time and Speed', 35, 'personal_life',
+          p2('C1-U2-L1', 'At the Drop of a Hat — Idioms of Time and Speed', 35, 'personal_life',
             ['idioms_time_speed'], 'I can understand and use 15 time/speed idioms naturally.'),
-          planned('C1-U2-L2', 'Break New Ground — Idioms of Progress and Change', 35, 'work_business',
+          p2('C1-U2-L2', 'Break New Ground — Idioms of Progress and Change', 35, 'work_business',
             ['idioms_progress_change'], 'I can use 15 idioms relating to progress and innovation.'),
-          planned('C1-U2-L3', 'Fine-Grained Word Choice: Synonyms and Near-Synonyms', 35, 'education_study',
+          p2('C1-U2-L3', 'Fine-Grained Word Choice: Synonyms and Near-Synonyms', 35, 'education_study',
             ['lexical_precision'],
             'I can choose between near-synonyms based on connotation and register.'),
-          planned('C1-U2-L4', 'Collocations in Academic English', 35, 'education_study',
+          p2('C1-U2-L4', 'Collocations in Academic English', 35, 'education_study',
             ['academic_collocations'],
             'I can use key academic collocations: conduct research, draw conclusions, raise awareness.'),
-          planned('C1-U2-L5', 'Complex Multi-Word Verbs at C1', 35, 'work_business',
+          p2('C1-U2-L5', 'Complex Multi-Word Verbs at C1', 35, 'work_business',
             ['multi_word_verbs_c1'],
             'I can use complex multi-word verbs accurately in professional contexts.'),
         ],
@@ -1252,19 +1461,19 @@
         title: 'Managing Interaction: Discourse and Pragmatics',
         description: 'Turn-taking, interruption, hedging, implicature, and managing difficult conversations.',
         lessons: [
-          planned('C1-U3-L1', 'Can I Just Say … — Interrupting and Turn-Taking', 35, 'work_business',
+          p2('C1-U3-L1', 'Can I Just Say … — Interrupting and Turn-Taking', 35, 'work_business',
             ['turn_taking_interruption'],
             'I can interrupt politely and regain the floor in formal discussions.'),
-          planned('C1-U3-L2', 'With Respect … — Tactful Disagreement', 35, 'work_business',
+          p2('C1-U3-L2', 'With Respect … — Tactful Disagreement', 35, 'work_business',
             ['tactful_disagreement'],
             'I can challenge and disagree diplomatically using hedged language.'),
-          planned('C1-U3-L3', 'Reading Between the Lines — Implicature and Implicit Meaning', 35, 'community_public',
+          p2('C1-U3-L3', 'Reading Between the Lines — Implicature and Implicit Meaning', 35, 'community_public',
             ['implicature_pragmatics'],
             'I can infer unstated meaning and respond to implication.'),
-          planned('C1-U3-L4', 'Facilitation Language: Managing a Meeting', 35, 'work_business',
+          p2('C1-U3-L4', 'Facilitation Language: Managing a Meeting', 35, 'work_business',
             ['facilitation_language'],
             'I can chair a discussion, invite contributions, and summarise.'),
-          planned('C1-U3-L5', 'Persuasion and Influence: A Negotiation', 35, 'work_business',
+          p2('C1-U3-L5', 'Persuasion and Influence: A Negotiation', 35, 'work_business',
             ['persuasion_language', 'tactful_disagreement'],
             'I can persuade, concede, and reach agreement in a complex negotiation.'),
         ],
@@ -1274,18 +1483,18 @@
         title: 'Academic and Professional Writing',
         description: 'Proposals, literature reviews, reports of research, and critical reviews.',
         lessons: [
-          planned('C1-U4-L1', 'Writing a Proposal: Aims and Rationale', 35, 'education_study',
+          p2('C1-U4-L1', 'Writing a Proposal: Aims and Rationale', 35, 'education_study',
             ['proposal_writing'], 'I can write a formal project proposal with clear aims and justification.'),
-          planned('C1-U4-L2', 'Critical Review: Evaluating an Argument', 35, 'education_study',
+          p2('C1-U4-L2', 'Critical Review: Evaluating an Argument', 35, 'education_study',
             ['critical_review_writing'],
             'I can write a balanced critical review assessing strengths and weaknesses.'),
-          planned('C1-U4-L3', 'Hedging in Academic Writing', 35, 'education_study',
+          p2('C1-U4-L3', 'Hedging in Academic Writing', 35, 'education_study',
             ['academic_hedging'],
             'I can hedge claims appropriately using modal verbs, adverbs, and reporting verbs.'),
-          planned('C1-U4-L4', 'Concision: Saying More With Fewer Words', 35, 'work_business',
+          p2('C1-U4-L4', 'Concision: Saying More With Fewer Words', 35, 'work_business',
             ['nominalisation', 'ellipsis_substitution'],
             'I can reduce wordiness using nominalisation, ellipsis, and parallel structure.'),
-          planned('C1-U4-L5', 'C1 Exit Challenge: Write a Professional Report', 40, 'work_business',
+          p2('C1-U4-L5', 'C1 Exit Challenge: Write a Professional Report', 40, 'work_business',
             ['report_writing_structure', 'passive_present_past', 'academic_hedging', 'nominalisation'],
             'I can produce a 300-word professional report that meets C1 quality standards.'),
         ],
@@ -1397,15 +1606,15 @@
         title: 'Style and Register: Mastery of the Full Range',
         description: 'Literary, legal, journalistic, and conversational styles; code-switching.',
         lessons: [
-          planned('C2-U1-L1', 'The Legal Register: Contracts, Clauses, and Conditions', 40, 'work_business',
+          p2('C2-U1-L1', 'The Legal Register: Contracts, Clauses, and Conditions', 40, 'work_business',
             ['legal_register'], 'I can understand and produce text in formal legal English.'),
-          planned('C2-U1-L2', 'The Literary Register: Imagery, Metaphor, and Tone', 40, 'education_study',
+          p2('C2-U1-L2', 'The Literary Register: Imagery, Metaphor, and Tone', 40, 'education_study',
             ['literary_register'], 'I can analyse and reproduce literary style using imagery and figurative language.'),
-          planned('C2-U1-L3', 'Journalistic English: Headlines, Leads, and Attribution', 40, 'community_public',
+          p2('C2-U1-L3', 'Journalistic English: Headlines, Leads, and Attribution', 40, 'community_public',
             ['journalistic_register'], 'I can write and analyse English news texts across broadsheet and tabloid styles.'),
-          planned('C2-U1-L4', 'Code-Switching: Adapting to Audience Instantly', 40, 'personal_life',
+          p2('C2-U1-L4', 'Code-Switching: Adapting to Audience Instantly', 40, 'personal_life',
             ['code_switching'], 'I can switch seamlessly between formal and informal registers mid-interaction.'),
-          planned('C2-U1-L5', 'Register Portfolio: One Topic, Four Registers', 40, 'education_study',
+          p2('C2-U1-L5', 'Register Portfolio: One Topic, Four Registers', 40, 'education_study',
             ['legal_register', 'literary_register', 'journalistic_register', 'code_switching'],
             'I can write the same message in four distinct registers and justify each.'),
         ],
@@ -1415,18 +1624,18 @@
         title: 'Rhetoric and Persuasion at the Highest Level',
         description: 'Classical rhetorical devices: ethos, pathos, logos; anaphora, tricolon, chiasmus.',
         lessons: [
-          planned('C2-U2-L1', 'Ethos, Pathos, Logos — The Three Pillars of Rhetoric', 40, 'education_study',
+          p2('C2-U2-L1', 'Ethos, Pathos, Logos — The Three Pillars of Rhetoric', 40, 'education_study',
             ['rhetorical_appeals'], 'I can identify and use all three Aristotelian appeals strategically.'),
-          planned('C2-U2-L2', 'Anaphora and Tricolon — Rhythm in Persuasion', 40, 'community_public',
+          p2('C2-U2-L2', 'Anaphora and Tricolon — Rhythm in Persuasion', 40, 'community_public',
             ['rhetorical_devices_repetition'],
             'I can use anaphora, tricolon, and other repetition devices for powerful effect.'),
-          planned('C2-U2-L3', 'Irony, Sarcasm, and Understatement', 40, 'personal_life',
+          p2('C2-U2-L3', 'Irony, Sarcasm, and Understatement', 40, 'personal_life',
             ['irony_understatement'],
             'I can produce and interpret irony, sarcasm, and understatement accurately.'),
-          planned('C2-U2-L4', 'A Political Speech: Writing for Impact', 40, 'community_public',
+          p2('C2-U2-L4', 'A Political Speech: Writing for Impact', 40, 'community_public',
             ['rhetorical_appeals', 'rhetorical_devices_repetition'],
             'I can write a persuasive speech that deploys multiple rhetorical devices.'),
-          planned('C2-U2-L5', 'Cultural Allusion and Shared Reference', 40, 'education_study',
+          p2('C2-U2-L5', 'Cultural Allusion and Shared Reference', 40, 'education_study',
             ['cultural_allusion'],
             'I can understand and exploit cultural allusions in English speech and writing.'),
         ],
@@ -1436,18 +1645,18 @@
         title: 'Ambiguity, Humour, and Pragmatic Mastery',
         description: 'Puns, double meanings, dark humour, comic timing, and pragmatic subtlety.',
         lessons: [
-          planned('C2-U3-L1', 'Puns and Wordplay: How English Exploits Ambiguity', 40, 'personal_life',
+          p2('C2-U3-L1', 'Puns and Wordplay: How English Exploits Ambiguity', 40, 'personal_life',
             ['wordplay_puns'], 'I can understand and create English wordplay and puns.'),
-          planned('C2-U3-L2', 'Dark Humour and Taboo Topics', 40, 'personal_life',
+          p2('C2-U3-L2', 'Dark Humour and Taboo Topics', 40, 'personal_life',
             ['dark_humour_pragmatics'],
             'I can recognise the pragmatic boundaries of humour across cultural contexts.'),
-          planned('C2-U3-L3', 'Saying One Thing, Meaning Another: Irony in Depth', 40, 'personal_life',
+          p2('C2-U3-L3', 'Saying One Thing, Meaning Another: Irony in Depth', 40, 'personal_life',
             ['irony_understatement', 'implicature_pragmatics'],
             'I can produce extended ironic discourse and interpret layered implication.'),
-          planned('C2-U3-L4', 'Face-Threatening Acts and Politeness Theory', 40, 'work_business',
+          p2('C2-U3-L4', 'Face-Threatening Acts and Politeness Theory', 40, 'work_business',
             ['politeness_theory'],
             'I can identify and manage face-threatening acts in professional and social interaction.'),
-          planned('C2-U3-L5', 'C2 Capstone Presentation: The Art of English', 45, 'education_study',
+          p2('C2-U3-L5', 'C2 Capstone Presentation: The Art of English', 45, 'education_study',
             ['rhetorical_appeals', 'irony_understatement', 'code_switching', 'cultural_allusion'],
             'I can deliver a polished, stylistically rich presentation on a topic of my choice.'),
         ],
@@ -1457,18 +1666,18 @@
         title: 'Academic Mastery: Publishing-Quality Writing',
         description: 'Research writing, peer-review language, abstract writing, and academic integrity.',
         lessons: [
-          planned('C2-U4-L1', 'The Abstract: Maximum Information in Minimum Space', 40, 'education_study',
+          p2('C2-U4-L1', 'The Abstract: Maximum Information in Minimum Space', 40, 'education_study',
             ['abstract_writing'], 'I can write a concise, complete academic abstract.'),
-          planned('C2-U4-L2', 'Literature Review Language: Synthesis and Critique', 40, 'education_study',
+          p2('C2-U4-L2', 'Literature Review Language: Synthesis and Critique', 40, 'education_study',
             ['literature_review_writing'],
             'I can synthesise multiple sources into a coherent, critically evaluative literature review.'),
-          planned('C2-U4-L3', 'Paraphrase and Avoidance of Plagiarism', 40, 'education_study',
+          p2('C2-U4-L3', 'Paraphrase and Avoidance of Plagiarism', 40, 'education_study',
             ['academic_paraphrase'],
             'I can paraphrase and integrate sources at publishable academic standard.'),
-          planned('C2-U4-L4', 'Peer Review: Giving and Receiving Critical Feedback', 40, 'education_study',
+          p2('C2-U4-L4', 'Peer Review: Giving and Receiving Critical Feedback', 40, 'education_study',
             ['peer_review_language'],
             'I can write and respond to formal academic peer review using discipline-appropriate language.'),
-          planned('C2-U4-L5', 'C2 Final Challenge: A Publishable Mini-Essay', 50, 'education_study',
+          p2('C2-U4-L5', 'C2 Final Challenge: A Publishable Mini-Essay', 50, 'education_study',
             ['nominalisation', 'academic_hedging', 'rhetorical_appeals', 'literature_review_writing'],
             'I can write a 400-word essay that meets publishable academic standards.'),
         ],
@@ -1559,17 +1768,60 @@
     C2: C2,
   };
 
+  /* Canonical iteration order — used throughout the API */
+  var LEVEL_ORDER = ['A0', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+
   /* ─────────────────────────────────────────────
-     COUNT HELPERS
+     BACKFILL PASS
+     Ensures every lesson stub (including those created with old `planned()`
+     before the p-arg was added) has the three required fields.
+  ───────────────────────────────────────────── */
+  function backfillLessonFields(levelCode, lvl) {
+    var lvlPriority = lvl.launchPriority || 'P1';
+
+    /* Bridge lessons (A0 only) */
+    if (lvl.foundationBridge) {
+      var brPriority = lvl.foundationBridge.launchPriority || lvlPriority;
+      (lvl.foundationBridge.lessons || []).forEach(function (l) {
+        if (!l.contentType)   l.contentType   = 'CURATED_CORE';
+        if (!l.contentStatus) l.contentStatus = l.status === 'PUBLISHED' ? 'PUBLISHED' : 'PLANNED';
+        if (!l.launchPriority) l.launchPriority = brPriority;
+        l.levelCode = levelCode;
+        l.bridgeLesson = true;
+      });
+    }
+
+    (lvl.units || []).forEach(function (unit) {
+      var unitPriority = unit.launchPriority || lvlPriority;
+      (unit.lessons || []).forEach(function (l) {
+        if (!l.contentType)    l.contentType   = 'CURATED_CORE';
+        if (!l.contentStatus)  l.contentStatus = l.status === 'PUBLISHED' ? 'PUBLISHED' : 'PLANNED';
+        if (!l.launchPriority) l.launchPriority = unitPriority;
+        l.levelCode = levelCode;
+        l.unitCode  = unit.code;
+      });
+    });
+  }
+
+  Object.keys(levels).forEach(function (code) {
+    backfillLessonFields(code, levels[code]);
+  });
+
+  /* ─────────────────────────────────────────────
+     FLATTEN HELPERS
   ───────────────────────────────────────────── */
 
-  /** Flatten all lesson stubs from a single level */
-  function getLessonsForLevel(level) {
+  /**
+   * Flatten all lesson stubs from a level.
+   * includeBridge=true (default) includes A0 Foundation Bridge lessons first.
+   */
+  function getLessonsForLevel(level, includeBridge) {
     var lessons = [];
+    if (includeBridge !== false && level.foundationBridge) {
+      (level.foundationBridge.lessons || []).forEach(function (l) { lessons.push(l); });
+    }
     (level.units || []).forEach(function (unit) {
-      (unit.lessons || []).forEach(function (lesson) {
-        lessons.push(lesson);
-      });
+      (unit.lessons || []).forEach(function (lesson) { lessons.push(lesson); });
     });
     return lessons;
   }
@@ -1577,52 +1829,56 @@
   /** Build summary counts across all levels */
   function buildCounts() {
     var counts = {
-      byLevel: {},
-      byPriority: { P0: 0, P1: 0, P2: 0 },
+      byLevel:      {},
+      byPriority:   { P0: 0, P1: 0, P2: 0 },
       totalLessons: 0,
-      totalUnits: 0,
-      published: 0,
-      planned: 0,
+      totalUnits:   0,
+      bridgeLessons: 0,
+      published:    0,
+      planned:      0,
     };
 
     Object.keys(levels).forEach(function (code) {
       var lvl = levels[code];
-      var lessons = getLessonsForLevel(lvl);
+      var lessons = getLessonsForLevel(lvl, true);
       var unitCount = (lvl.units || []).length;
-      var publishedCount = lessons.filter(function (l) { return l.status === 'PUBLISHED'; }).length;
-      var plannedCount   = lessons.filter(function (l) { return l.status === 'PLANNED';   }).length;
+      var bridgeCount = lvl.foundationBridge ? (lvl.foundationBridge.lessons || []).length : 0;
+      var publishedCount = lessons.filter(function (l) { return l.contentStatus === 'PUBLISHED'; }).length;
+      var plannedCount   = lessons.filter(function (l) { return l.contentStatus !== 'PUBLISHED'; }).length;
 
       counts.byLevel[code] = {
         units:     unitCount,
+        bridge:    bridgeCount,
         lessons:   lessons.length,
         published: publishedCount,
         planned:   plannedCount,
         priority:  lvl.launchPriority,
       };
 
-      counts.totalUnits   += unitCount;
-      counts.totalLessons += lessons.length;
-      counts.published    += publishedCount;
-      counts.planned      += plannedCount;
+      counts.totalUnits    += unitCount;
+      counts.totalLessons  += lessons.length;
+      counts.bridgeLessons += bridgeCount;
+      counts.published     += publishedCount;
+      counts.planned       += plannedCount;
 
-      var p = lvl.launchPriority;
-      if (counts.byPriority[p] !== undefined) {
-        counts.byPriority[p] += lessons.length;
-      }
+      /* Count by lesson-level launchPriority */
+      lessons.forEach(function (l) {
+        var p = l.launchPriority || lvl.launchPriority;
+        if (counts.byPriority[p] !== undefined) counts.byPriority[p]++;
+      });
     });
 
     return counts;
   }
 
   /* ─────────────────────────────────────────────
-     LOOKUP HELPERS
+     CORE LOOKUP HELPERS (Batch 1 API — preserved)
   ───────────────────────────────────────────── */
 
-  /** Return a lesson stub by ID (searches all levels) */
   function getLessonById(id) {
     var result = null;
-    Object.keys(levels).some(function (code) {
-      getLessonsForLevel(levels[code]).some(function (lesson) {
+    LEVEL_ORDER.some(function (code) {
+      getLessonsForLevel(levels[code], true).some(function (lesson) {
         if (lesson.id === id) { result = lesson; return true; }
         return false;
       });
@@ -1631,30 +1887,231 @@
     return result;
   }
 
-  /** Return all lessons for a level code (flat array) */
   function getLessonsByLevel(code) {
-    return levels[code] ? getLessonsForLevel(levels[code]) : [];
+    return levels[code] ? getLessonsForLevel(levels[code], true) : [];
   }
 
-  /** Return all lessons for a unit code */
   function getLessonsByUnit(unitCode) {
     var result = [];
-    Object.keys(levels).forEach(function (code) {
+    LEVEL_ORDER.forEach(function (code) {
       (levels[code].units || []).forEach(function (unit) {
-        if (unit.code === unitCode) {
-          result = result.concat(unit.lessons || []);
-        }
+        if (unit.code === unitCode) result = result.concat(unit.lessons || []);
       });
     });
     return result;
   }
 
-  /** Return all published lessons */
   function getPublishedLessons() {
     var result = [];
-    Object.keys(levels).forEach(function (code) {
-      getLessonsForLevel(levels[code]).forEach(function (lesson) {
-        if (lesson.status === 'PUBLISHED') result.push(lesson);
+    LEVEL_ORDER.forEach(function (code) {
+      getLessonsForLevel(levels[code], true).forEach(function (lesson) {
+        if (lesson.contentStatus === 'PUBLISHED') result.push(lesson);
+      });
+    });
+    return result;
+  }
+
+  /* ─────────────────────────────────────────────
+     EXTENDED API — Phase 2 Batch 2
+  ───────────────────────────────────────────── */
+
+  /** Return the ordered list of units (+ bridge) for a level */
+  function getPathByLevel(code) {
+    var lvl = levels[code];
+    if (!lvl) return null;
+    var path = { level: lvl, segments: [] };
+    if (lvl.foundationBridge) {
+      path.segments.push({ type: 'bridge', data: lvl.foundationBridge });
+    }
+    (lvl.units || []).forEach(function (unit) {
+      path.segments.push({ type: 'unit', data: unit });
+    });
+    return path;
+  }
+
+  /** Return units array for a level (excludes bridge) */
+  function getUnitsByLevel(code) {
+    return levels[code] ? (levels[code].units || []) : [];
+  }
+
+  /**
+   * Return prerequisite lesson IDs for a lesson.
+   * Phase 2 Batch 2 rule: the lesson immediately before in unit order is the prerequisite.
+   * The first lesson in each unit has the last lesson of the previous unit as prerequisite,
+   * except A1-U1-L1 which has no prerequisites (first lesson in the path).
+   * A0 bridge lessons require the previous bridge lesson.
+   */
+  function getPrerequisites(lessonId) {
+    var prereqs = [];
+    var found = false;
+    LEVEL_ORDER.some(function (code) {
+      var lvl = levels[code];
+      var allSegments = [];
+      if (lvl.foundationBridge) allSegments.push(lvl.foundationBridge.lessons || []);
+      (lvl.units || []).forEach(function (u) { allSegments.push(u.lessons || []); });
+
+      allSegments.some(function (segLessons, si) {
+        return segLessons.some(function (lesson, li) {
+          if (lesson.id === lessonId) {
+            if (li > 0) {
+              prereqs.push(segLessons[li - 1].id);
+            } else if (si > 0) {
+              var prevSeg = allSegments[si - 1];
+              if (prevSeg.length > 0) prereqs.push(prevSeg[prevSeg.length - 1].id);
+            }
+            found = true;
+            return true;
+          }
+          return false;
+        });
+      });
+      return found;
+    });
+    return prereqs;
+  }
+
+  /**
+   * Return the next lesson after the given lesson ID.
+   * Crosses unit and level boundaries in LEVEL_ORDER.
+   */
+  function getNextLesson(lessonId) {
+    var allLessons = [];
+    LEVEL_ORDER.forEach(function (code) {
+      getLessonsForLevel(levels[code], true).forEach(function (l) { allLessons.push(l); });
+    });
+    var idx = allLessons.findIndex(function (l) { return l.id === lessonId; });
+    return idx >= 0 && idx < allLessons.length - 1 ? allLessons[idx + 1] : null;
+  }
+
+  /** Return all lessons filtered by launchPriority */
+  function getLessonsByPriority(priority) {
+    var result = [];
+    LEVEL_ORDER.forEach(function (code) {
+      getLessonsForLevel(levels[code], true).forEach(function (l) {
+        if (l.launchPriority === priority) result.push(l);
+      });
+    });
+    return result;
+  }
+
+  /** Return all lessons filtered by contentStatus */
+  function getLessonsByStatus(status) {
+    var result = [];
+    LEVEL_ORDER.forEach(function (code) {
+      getLessonsForLevel(levels[code], true).forEach(function (l) {
+        if (l.contentStatus === status) result.push(l);
+      });
+    });
+    return result;
+  }
+
+  /**
+   * Resolve learner-facing availability for a lesson.
+   * This is the SINGLE SOURCE OF TRUTH for lesson state shown in any UI.
+   *
+   * @param {string}  lessonId
+   * @param {object}  learnerProgress  — map of lessonId → { completed: bool, inProgress: bool, reviewDue: bool }
+   *                                     Pass null/undefined for unauthenticated/anonymous state.
+   * @returns {string} COMING_SOON | LOCKED | READY | IN_PROGRESS | COMPLETED | REVIEW_DUE
+   */
+  function getLessonAvailability(lessonId, learnerProgress) {
+    var lesson = getLessonById(lessonId);
+    if (!lesson) return 'COMING_SOON';
+
+    /* Unpublished content is always COMING_SOON regardless of learner state */
+    if (lesson.contentStatus !== 'PUBLISHED') return 'COMING_SOON';
+
+    /* No learner progress data → treat as READY for the first published lesson */
+    if (!learnerProgress) return 'READY';
+
+    var lp = learnerProgress[lessonId] || {};
+
+    if (lp.reviewDue)   return 'REVIEW_DUE';
+    if (lp.completed)   return 'COMPLETED';
+    if (lp.inProgress)  return 'IN_PROGRESS';
+
+    /* Check prerequisites */
+    var prereqs = getPrerequisites(lessonId);
+    var prereqsMet = prereqs.every(function (pid) {
+      var pp = learnerProgress[pid] || {};
+      return pp.completed === true;
+    });
+
+    return prereqsMet ? 'READY' : 'LOCKED';
+  }
+
+  /** Return unit-level progress summary */
+  function getUnitProgress(unitCode, learnerProgress) {
+    var lessons = getLessonsByUnit(unitCode);
+    var lp = learnerProgress || {};
+    var published = lessons.filter(function (l) { return l.contentStatus === 'PUBLISHED'; });
+    var completed  = published.filter(function (l) { return (lp[l.id] || {}).completed; });
+    var inProgress = published.filter(function (l) { return (lp[l.id] || {}).inProgress; });
+    return {
+      unitCode:    unitCode,
+      total:       lessons.length,
+      published:   published.length,
+      planned:     lessons.length - published.length,
+      completed:   completed.length,
+      inProgress:  inProgress.length,
+      pct:         published.length ? Math.round((completed.length / published.length) * 100) : 0,
+    };
+  }
+
+  /** Return level-level progress summary */
+  function getLevelProgress(levelCode, learnerProgress) {
+    var lessons = getLessonsByLevel(levelCode);
+    var lp = learnerProgress || {};
+    var published  = lessons.filter(function (l) { return l.contentStatus === 'PUBLISHED'; });
+    var completed  = published.filter(function (l) { return (lp[l.id] || {}).completed; });
+    var inProgress = published.filter(function (l) { return (lp[l.id] || {}).inProgress; });
+    return {
+      levelCode:   levelCode,
+      total:       lessons.length,
+      published:   published.length,
+      planned:     lessons.length - published.length,
+      completed:   completed.length,
+      inProgress:  inProgress.length,
+      pct:         published.length ? Math.round((completed.length / published.length) * 100) : 0,
+    };
+  }
+
+  /**
+   * Return lessons with a due SRS review for the learner.
+   * Delegates to window.LX.persist if available; otherwise returns empty array.
+   * Full implementation lives in persist.js.
+   */
+  function getReviewDueLessons(learnerId) {
+    if (window.LX && window.LX.persist && typeof window.LX.persist.getAllReviewEvents === 'function') {
+      var events = window.LX.persist.getAllReviewEvents();
+      var dueIds = {};
+      events.forEach(function (ev) {
+        if (ev.status === 'AVAILABLE' && ev.lesson_id) dueIds[ev.lesson_id] = true;
+      });
+      return Object.keys(dueIds).map(getLessonById).filter(Boolean);
+    }
+    return [];
+  }
+
+  /** Return all lessons for a scenario family */
+  function getLessonsByScenario(scenarioFamily) {
+    var result = [];
+    LEVEL_ORDER.forEach(function (code) {
+      getLessonsForLevel(levels[code], true).forEach(function (l) {
+        if (l.scenarioFamily === scenarioFamily) result.push(l);
+      });
+    });
+    return result;
+  }
+
+  /** Return all lessons that include a given grammar point ID */
+  function getLessonsByGrammarPoint(grammarPointId) {
+    var result = [];
+    LEVEL_ORDER.forEach(function (code) {
+      getLessonsForLevel(levels[code], true).forEach(function (l) {
+        if (Array.isArray(l.grammarFocus) && l.grammarFocus.indexOf(grammarPointId) !== -1) {
+          result.push(l);
+        }
       });
     });
     return result;
@@ -1664,36 +2121,49 @@
      FINAL EXPORT — window.LX.curriculum
   ───────────────────────────────────────────── */
   window.LX.curriculum = {
-    version: '2.0.0',
-    phase: 'Phase 2 — Batch 1',
+    version: '2.1.0',
+    phase: 'Phase 2 — Batch 2',
     generatedAt: '2024-09',
 
     /* The canonical levels map */
     levels: levels,
 
-    /* Pre-built counts (recomputed on init) */
+    /* Pre-built counts */
     counts: buildCounts(),
 
-    /* Public API */
-    getLessonById:      getLessonById,
-    getLessonsByLevel:  getLessonsByLevel,
-    getLessonsByUnit:   getLessonsByUnit,
+    /* CEFR level order for iteration */
+    LEVEL_ORDER: LEVEL_ORDER,
+
+    /* ── Batch 1 API (preserved) ── */
+    getLessonById:       getLessonById,
+    getLessonsByLevel:   getLessonsByLevel,
+    getLessonsByUnit:    getLessonsByUnit,
     getPublishedLessons: getPublishedLessons,
 
-    /* CEFR level order for iteration */
-    LEVEL_ORDER: ['A0', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'],
+    /* ── Batch 2 API (new) ── */
+    getPathByLevel:           getPathByLevel,
+    getUnitsByLevel:          getUnitsByLevel,
+    getPrerequisites:         getPrerequisites,
+    getNextLesson:            getNextLesson,
+    getLessonsByPriority:     getLessonsByPriority,
+    getLessonsByStatus:       getLessonsByStatus,
+    getLessonAvailability:    getLessonAvailability,
+    getUnitProgress:          getUnitProgress,
+    getLevelProgress:         getLevelProgress,
+    getReviewDueLessons:      getReviewDueLessons,
+    getLessonsByScenario:     getLessonsByScenario,
+    getLessonsByGrammarPoint: getLessonsByGrammarPoint,
   };
 
-  /* Convenience log (dev only — remove in production) */
+  /* Dev log */
   if (typeof console !== 'undefined' && console.log) {
     var c = window.LX.curriculum.counts;
     console.log(
-      '[LinguaX Curriculum] Loaded Phase 2 Batch 1 — ' +
-      c.totalLessons + ' lessons across ' + c.totalUnits + ' units | ' +
-      'Published: ' + c.published + ' | Planned: ' + c.planned + ' | ' +
-      'P0: ' + c.byPriority.P0 + ' P1: ' + c.byPriority.P1 + ' P2: ' + c.byPriority.P2
+      '[LinguaX Curriculum v2.1] Phase 2 Batch 2 — ' +
+      c.totalLessons + ' lessons (' + c.bridgeLessons + ' bridge) across ' +
+      c.totalUnits + ' units | Published: ' + c.published + ' | Planned: ' + c.planned +
+      ' | P0: ' + c.byPriority.P0 + ' P1: ' + c.byPriority.P1 + ' P2: ' + c.byPriority.P2
     );
   }
-
 
 })();
