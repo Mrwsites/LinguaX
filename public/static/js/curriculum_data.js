@@ -106,6 +106,1140 @@
     };
   }
 
+  /* ─────────────────────────────────────────────
+     HELPER — build a PUBLISHED lesson stub with inline body
+     id, title, mins, scenario, grammar, objective, level, bodyKey
+     Body is stored in window.LX.lessonBodies[bodyKey]
+  ───────────────────────────────────────────── */
+  function pub(id, title, mins, scenario, grammar, objective, level, bodyKey) {
+    return {
+      id: id,
+      title: title,
+      contentType: 'CURATED_CORE',
+      contentStatus: 'PUBLISHED',
+      launchPriority: 'P0',
+      status: 'PUBLISHED',
+      estimatedMinutes: mins || 20,
+      scenarioFamily: scenario || 'personal_life',
+      grammarFocus: grammar || [],
+      objective: objective || '',
+      cefrLevel: level || 'A0',
+      bodyRef: 'window.LX.lessonBodies.' + (bodyKey || id),
+    };
+  }
+
+  /* ─────────────────────────────────────────────
+     INLINE LESSON BODIES — A0 Bridge + A1 + A2
+     Stored at window.LX.lessonBodies[id]
+     Each body follows the 12-stage lesson template:
+     overview → visual → grammar → coresentence → vocabulary →
+     phrases → practice → dialogue → infogap → transfer →
+     feedback → review
+  ───────────────────────────────────────────── */
+  window.LX = window.LX || {};
+  window.LX.lessonBodies = window.LX.lessonBodies || {};
+
+  /* ── Shared helper: build a minimal lesson body ── */
+  function _mkBody(id, title, level, objective, grammar, vocab, sentences, phrases, practiceItems, dialogue, infoGap, transfer) {
+    return {
+      id: id,
+      version: '1.0.0',
+      title: title,
+      cefrLevel: level,
+      objective: objective,
+      grammarPointIds: grammar || [],
+      overview: {
+        scenarioTitle: title,
+        cefrLevel: level,
+        objective: objective,
+        grammarFocus: (grammar || []).join(', '),
+        estimatedMinutes: 20,
+        stagesPreview: ['Visual', 'Grammar', 'Vocabulary', 'Practice', 'Dialogue', 'Transfer'],
+      },
+      visual: {
+        imageDescription: 'Illustrated scene showing the lesson context.',
+        caption: sentences && sentences[0] ? sentences[0] : title,
+        comprehensionCheck: {
+          question: 'What can you see?',
+          options: ['People talking', 'An empty room', 'A street', 'A book'],
+          correct: 0,
+        },
+      },
+      grammar: {
+        title: 'Grammar Focus: ' + (grammar || []).join(', '),
+        explanation: 'We use these patterns to communicate effectively in English.',
+        examples: sentences ? sentences.slice(0, 4) : [],
+        quickCheck: {
+          question: 'Which sentence is correct?',
+          options: sentences ? [sentences[0], '...is wrong...', '...also wrong...'] : ['Option A', 'Option B', 'Option C'],
+          correct: 0,
+        },
+      },
+      coreSentences: sentences ? sentences.map(function(s, i) { return { id: 'cs-' + i, sentence: s, translation: '', notes: '' }; }) : [],
+      vocabulary: vocab ? vocab.map(function(v, i) { return { id: 'v-' + i, word: v.w, definition: v.d, example: v.e || '' }; }) : [],
+      usefulPhrases: phrases ? phrases.map(function(p, i) { return { id: 'ph-' + i, phrase: p.p, context: p.c || '', response: p.r || '' }; }) : [],
+      practice: {
+        recognition: practiceItems && practiceItems.recognition ? practiceItems.recognition : [],
+        matching: practiceItems && practiceItems.matching ? practiceItems.matching : [],
+        controlledProduction: practiceItems && practiceItems.controlled ? practiceItems.controlled : [],
+        questionTransform: practiceItems && practiceItems.transform ? practiceItems.transform : [],
+      },
+      guidedDialogue: dialogue || {
+        setup: 'Role-play the conversation using the language from this lesson.',
+        turns: [],
+        partB: [],
+      },
+      informationGap: infoGap || {
+        taskDescription: 'Ask and answer questions to complete the missing information.',
+        studentHas: [],
+        partnerHas: [],
+        questions: [],
+      },
+      transferChallenge: transfer || {
+        instruction: 'Use today\'s language in a new situation.',
+        scenarios: [{ id: 'sc1', title: 'New Situation', setting: 'A real-world context', studentRole: 'Yourself', partnerRole: 'Another person', newGap: 'Use what you learned today', lostItems: [], targetLanguage: sentences ? sentences.slice(0, 2) : [], successCriteria: objective }],
+      },
+      rubric: {
+        dimensions: [
+          { id: 'target_grammar', label: 'Target Grammar', max: 2 },
+          { id: 'vocabulary', label: 'Vocabulary Use', max: 2 },
+          { id: 'meaning', label: 'Meaning', max: 2 },
+          { id: 'interaction', label: 'Interaction', max: 2 },
+        ],
+        scoreBands: [
+          { min: 0, max: 3, label: 'Reteach', desc: 'Review the lesson and try again.' },
+          { min: 4, max: 5, label: 'Emerging', desc: 'Good start! Keep practising.' },
+          { min: 6, max: 7, label: 'Developing', desc: 'You are making good progress.' },
+          { min: 8, max: 8, label: 'Secure', desc: 'Excellent! You have mastered this lesson.' },
+        ],
+      },
+    };
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     A0 BRIDGE LESSON BODIES (Lessons 1–8 published)
+  ═══════════════════════════════════════════════════════════════ */
+
+  window.LX.lessonBodies['A0-BRG-L1'] = _mkBody(
+    'A0-BRG-L1', 'Welcome to LinguaX: Platform & Classroom English', 'A0',
+    'I can follow platform instructions and understand classroom language.',
+    ['imperative_basic', 'greeting_formulaic'],
+    [
+      { w: 'listen', d: 'pay attention', e: 'Listen carefully.' },
+      { w: 'repeat', d: 'say again', e: 'Repeat after me.' },
+      { w: 'click', d: 'press with a mouse', e: 'Click the button.' },
+      { w: 'next', d: 'go forward', e: 'Click Next to continue.' },
+      { w: 'start', d: 'begin', e: 'Press Start to begin the lesson.' },
+    ],
+    ['Listen.', 'Repeat.', 'Click Next.', 'Press Start.', 'Hello! I am your teacher.', 'Welcome to LinguaX.'],
+    [
+      { p: 'Hello!', c: 'greeting', r: 'Hello!' },
+      { p: 'Welcome.', c: 'welcoming someone', r: 'Thank you.' },
+      { p: 'Listen, please.', c: 'classroom instruction', r: 'OK.' },
+      { p: 'Repeat after me.', c: 'classroom instruction', r: '(repeat)' },
+      { p: 'Click Next.', c: 'platform instruction', r: '(click)' },
+    ],
+    {
+      recognition: [
+        { id: 'r1', prompt: 'Which word means "say again"?', options: ['listen', 'repeat', 'click', 'next'], correct: 1 },
+        { id: 'r2', prompt: 'Which word means "pay attention"?', options: ['repeat', 'start', 'listen', 'next'], correct: 2 },
+      ],
+      matching: [
+        { id: 'm1', left: 'Listen', right: 'pay attention', correctRight: 'pay attention' },
+        { id: 'm2', left: 'Repeat', right: 'say again', correctRight: 'say again' },
+        { id: 'm3', left: 'Click', right: 'press', correctRight: 'press' },
+      ],
+      controlled: [
+        { id: 'c1', prompt: 'Type: "Hello!" (a greeting)', answer: 'Hello!' },
+        { id: 'c2', prompt: 'Type: "Welcome." (welcoming someone)', answer: 'Welcome.' },
+      ],
+    },
+    {
+      setup: 'You meet your teacher for the first time. Respond to the instructions.',
+      turns: [
+        { speaker: 'Teacher', text: 'Hello! Welcome to LinguaX.' },
+        { speaker: 'You', options: ['Hello! Thank you.', 'Goodbye.', 'I don\'t understand.'], correct: 0 },
+        { speaker: 'Teacher', text: 'Listen and repeat: Listen.' },
+        { speaker: 'You', options: ['Listen.', 'Hello.', 'Click.'], correct: 0 },
+      ],
+      partB: [
+        { frame: 'The teacher says "Repeat after me." You say:', answer: 'OK.' },
+        { frame: 'The teacher says "Click Next." You:', answer: 'click Next' },
+      ],
+    },
+    {
+      taskDescription: 'Ask your partner what the classroom words mean.',
+      studentHas: ['listen', 'repeat'],
+      partnerHas: ['click', 'next'],
+      questions: ['What does "listen" mean?', 'What does "click" mean?'],
+    },
+    {
+      instruction: 'Use today\'s classroom language in a real situation.',
+      scenarios: [{
+        id: 'sc1', title: 'New Student',
+        setting: 'A language classroom',
+        studentRole: 'New student',
+        partnerRole: 'Teacher',
+        newGap: 'Follow the teacher\'s instructions',
+        lostItems: [],
+        targetLanguage: ['Hello!', 'Thank you.', 'OK.'],
+        successCriteria: 'I can respond to basic classroom instructions.',
+      }],
+    }
+  );
+
+  window.LX.lessonBodies['A0-BRG-L2'] = _mkBody(
+    'A0-BRG-L2', 'Hello and Goodbye: Greetings and Farewells', 'A0',
+    'I can greet people and say goodbye using set phrases.',
+    ['greeting_formulaic', 'polite_formulaic'],
+    [
+      { w: 'hello', d: 'a greeting', e: 'Hello! How are you?' },
+      { w: 'goodbye', d: 'a farewell', e: 'Goodbye! See you tomorrow.' },
+      { w: 'morning', d: 'early part of the day', e: 'Good morning!' },
+      { w: 'evening', d: 'late part of the day', e: 'Good evening!' },
+      { w: 'please', d: 'polite word', e: 'Come in, please.' },
+    ],
+    ['Hello!', 'Hi!', 'Good morning!', 'Good afternoon!', 'Good evening!', 'Goodbye!', 'Bye!', 'See you later!'],
+    [
+      { p: 'Hello!', c: 'greeting (formal/informal)', r: 'Hello! / Hi!' },
+      { p: 'Good morning!', c: 'greeting in the morning', r: 'Good morning!' },
+      { p: 'Goodbye!', c: 'farewell', r: 'Goodbye! / Bye!' },
+      { p: 'See you later!', c: 'informal farewell', r: 'See you!' },
+      { p: 'How are you?', c: 'asking about wellbeing', r: 'Fine, thank you.' },
+    ],
+    {
+      recognition: [
+        { id: 'r1', prompt: 'Which is a greeting?', options: ['Goodbye', 'Hello', 'Please', 'Thank you'], correct: 1 },
+        { id: 'r2', prompt: 'Which is a farewell?', options: ['Hi', 'Good morning', 'See you later', 'Good afternoon'], correct: 2 },
+      ],
+      matching: [
+        { id: 'm1', left: 'Hello', right: 'greeting', correctRight: 'greeting' },
+        { id: 'm2', left: 'Goodbye', right: 'farewell', correctRight: 'farewell' },
+        { id: 'm3', left: 'Good morning', right: 'morning greeting', correctRight: 'morning greeting' },
+      ],
+      controlled: [
+        { id: 'c1', prompt: 'Write a greeting for the morning:', answer: 'Good morning!' },
+        { id: 'c2', prompt: 'Write a farewell:', answer: 'Goodbye!' },
+      ],
+    },
+    {
+      setup: 'You meet a classmate in the morning and say goodbye at the end of class.',
+      turns: [
+        { speaker: 'Classmate', text: 'Good morning!' },
+        { speaker: 'You', options: ['Good morning!', 'Goodbye!', 'Good evening!'], correct: 0 },
+        { speaker: 'Classmate', text: 'See you later!' },
+        { speaker: 'You', options: ['See you!', 'Good morning!', 'Please.'], correct: 0 },
+      ],
+      partB: [
+        { frame: 'You arrive at school. You say:', answer: 'Good morning!' },
+        { frame: 'You leave class. You say:', answer: 'Goodbye!' },
+      ],
+    },
+    {
+      taskDescription: 'Greet your partner and say goodbye.',
+      studentHas: ['morning greeting', 'informal farewell'],
+      partnerHas: ['evening greeting', 'formal farewell'],
+      questions: ['What do you say in the morning?', 'What do you say when leaving?'],
+    }
+  );
+
+  window.LX.lessonBodies['A0-BRG-L3'] = _mkBody(
+    'A0-BRG-L3', 'What Is Your Name? — Introductions', 'A0',
+    'I can give my name and ask someone else their name.',
+    ['name_exchange'],
+    [
+      { w: 'name', d: 'what you are called', e: 'My name is Maria.' },
+      { w: 'I', d: 'myself (first person)', e: 'I am Alex.' },
+      { w: 'my', d: 'belonging to me', e: 'My name is Sam.' },
+      { w: 'your', d: 'belonging to you', e: 'What is your name?' },
+      { w: 'nice', d: 'pleasant', e: 'Nice to meet you.' },
+    ],
+    ['My name is …', 'I am …', 'What is your name?', 'Nice to meet you.', 'And you?'],
+    [
+      { p: 'My name is [name].', c: 'introducing yourself', r: 'Nice to meet you, [name].' },
+      { p: 'What is your name?', c: 'asking for a name', r: 'My name is …' },
+      { p: 'Nice to meet you.', c: 'after an introduction', r: 'Nice to meet you too.' },
+      { p: 'I am [name].', c: 'introducing yourself (informal)', r: 'Hello, [name]!' },
+    ],
+    {
+      recognition: [
+        { id: 'r1', prompt: 'How do you ask for someone\'s name?', options: ['My name is ...', 'What is your name?', 'Nice to meet you.', 'I am ...'], correct: 1 },
+        { id: 'r2', prompt: 'How do you introduce yourself?', options: ['What is your name?', 'Nice to meet you.', 'My name is ...', 'Goodbye'], correct: 2 },
+      ],
+      matching: [
+        { id: 'm1', left: 'My name is …', right: 'introducing yourself', correctRight: 'introducing yourself' },
+        { id: 'm2', left: 'What is your name?', right: 'asking for a name', correctRight: 'asking for a name' },
+        { id: 'm3', left: 'Nice to meet you', right: 'after an introduction', correctRight: 'after an introduction' },
+      ],
+      controlled: [
+        { id: 'c1', prompt: 'Write how to introduce yourself (use your own name or "Alex"):', answer: 'My name is Alex.' },
+        { id: 'c2', prompt: 'Write how to ask for a name:', answer: 'What is your name?' },
+      ],
+    },
+    {
+      setup: 'You meet someone new. Introduce yourself and learn their name.',
+      turns: [
+        { speaker: 'Person', text: 'Hello! What is your name?' },
+        { speaker: 'You', options: ['My name is Alex.', 'Goodbye!', 'I don\'t know.'], correct: 0 },
+        { speaker: 'Person', text: 'Nice to meet you, Alex! I am Maria.' },
+        { speaker: 'You', options: ['Nice to meet you too, Maria!', 'Hello!', 'Goodbye!'], correct: 0 },
+      ],
+      partB: [
+        { frame: 'Introduce yourself to a new classmate:', answer: 'My name is …' },
+        { frame: 'Ask for their name:', answer: 'What is your name?' },
+      ],
+    },
+    {
+      taskDescription: 'Find out your partner\'s name and introduce yourself.',
+      studentHas: ['your own name'],
+      partnerHas: ['their own name'],
+      questions: ['What is your name?', 'How do you spell your name?'],
+    }
+  );
+
+  window.LX.lessonBodies['A0-BRG-L4'] = _mkBody(
+    'A0-BRG-L4', 'Where Are You From? — Nationality and Country', 'A0',
+    'I can say where I am from and understand country names.',
+    ['country_expression', 'name_exchange'],
+    [
+      { w: 'country', d: 'a nation (e.g. France)', e: 'My country is Brazil.' },
+      { w: 'from', d: 'showing origin', e: 'I am from Japan.' },
+      { w: 'where', d: 'asking about a place', e: 'Where are you from?' },
+      { w: 'nationality', d: 'the country you are from', e: 'My nationality is French.' },
+      { w: 'live', d: 'to reside', e: 'I live in London.' },
+    ],
+    ['I am from [country].', 'Where are you from?', 'I am [nationality].', 'I live in [city].'],
+    [
+      { p: 'Where are you from?', c: 'asking about origin', r: 'I am from …' },
+      { p: 'I am from [country].', c: 'saying your origin', r: 'Oh, really! I am from …' },
+      { p: 'What is your nationality?', c: 'asking about nationality', r: 'I am [nationality].' },
+    ],
+    {
+      recognition: [
+        { id: 'r1', prompt: 'How do you ask where someone is from?', options: ['What is your name?', 'Where are you from?', 'How old are you?', 'How are you?'], correct: 1 },
+        { id: 'r2', prompt: 'How do you say your origin?', options: ['I am from Brazil.', 'I have from Brazil.', 'I from Brazil.', 'Brazil I am.'], correct: 0 },
+      ],
+      matching: [
+        { id: 'm1', left: 'France', right: 'French', correctRight: 'French' },
+        { id: 'm2', left: 'Japan', right: 'Japanese', correctRight: 'Japanese' },
+        { id: 'm3', left: 'Brazil', right: 'Brazilian', correctRight: 'Brazilian' },
+      ],
+      controlled: [
+        { id: 'c1', prompt: 'Write: I am from [a country you know]:', answer: 'I am from …' },
+        { id: 'c2', prompt: 'Ask where someone is from:', answer: 'Where are you from?' },
+      ],
+    },
+    {
+      setup: 'You are at an international event. Ask people where they are from.',
+      turns: [
+        { speaker: 'New friend', text: 'Hello! My name is Paulo. Where are you from?' },
+        { speaker: 'You', options: ['I am from [country].', 'I am 25.', 'Goodbye!'], correct: 0 },
+        { speaker: 'Paulo', text: 'I am from Brazil! Nice to meet you.' },
+        { speaker: 'You', options: ['Nice to meet you too!', 'I don\'t know.', 'Goodbye!'], correct: 0 },
+      ],
+      partB: [
+        { frame: 'Tell someone where you are from:', answer: 'I am from …' },
+        { frame: 'Ask where they are from:', answer: 'Where are you from?' },
+      ],
+    },
+    {
+      taskDescription: 'Find out where your partner is from.',
+      studentHas: ['your own country', 'your nationality'],
+      partnerHas: ['their country', 'their nationality'],
+      questions: ['Where are you from?', 'What is your nationality?'],
+    }
+  );
+
+  window.LX.lessonBodies['A0-BRG-L5'] = _mkBody(
+    'A0-BRG-L5', 'How Old Are You? — Age and Numbers 1–20', 'A0',
+    'I can say my age and understand numbers 1–20.',
+    ['age_expression', 'cardinal_numbers'],
+    [
+      { w: 'old', d: 'having lived for some time', e: 'How old are you?' },
+      { w: 'age', d: 'how many years you have lived', e: 'My age is 25.' },
+      { w: 'year', d: '365 days', e: 'I am 20 years old.' },
+      { w: 'number', d: 'a figure (1, 2, 3...)', e: 'The number is five.' },
+    ],
+    ['I am [number] years old.', 'How old are you?', 'I am [age].', 'Numbers: one, two, three…'],
+    [
+      { p: 'How old are you?', c: 'asking age', r: 'I am … years old.' },
+      { p: 'I am [number] years old.', c: 'saying your age', r: 'And you?' },
+    ],
+    {
+      recognition: [
+        { id: 'r1', prompt: 'Which number comes after "fifteen"?', options: ['fourteen', 'thirteen', 'sixteen', 'twelve'], correct: 2 },
+        { id: 'r2', prompt: 'How do you ask someone\'s age?', options: ['What is your name?', 'How old are you?', 'Where are you from?', 'How are you?'], correct: 1 },
+      ],
+      matching: [
+        { id: 'm1', left: '1', right: 'one', correctRight: 'one' },
+        { id: 'm2', left: '10', right: 'ten', correctRight: 'ten' },
+        { id: 'm3', left: '20', right: 'twenty', correctRight: 'twenty' },
+      ],
+      controlled: [
+        { id: 'c1', prompt: 'Write your age in English (e.g. "I am 18 years old."):', answer: 'I am … years old.' },
+        { id: 'c2', prompt: 'Ask someone\'s age:', answer: 'How old are you?' },
+      ],
+    },
+    {
+      setup: 'You are filling in a form and practising numbers with a friend.',
+      turns: [
+        { speaker: 'Friend', text: 'How old are you?' },
+        { speaker: 'You', options: ['I am 20 years old.', 'I am from France.', 'My name is Alex.'], correct: 0 },
+        { speaker: 'Friend', text: 'I am 22. What is seven plus five?' },
+        { speaker: 'You', options: ['Twelve.', 'Ten.', 'Fifteen.'], correct: 0 },
+      ],
+      partB: [
+        { frame: 'Write your age in English:', answer: 'I am … years old.' },
+        { frame: 'Write the number fifteen in words:', answer: 'fifteen' },
+      ],
+    },
+    {
+      taskDescription: 'Find your partner\'s age and practise numbers.',
+      studentHas: ['your own age', 'numbers 1-10'],
+      partnerHas: ['their age', 'numbers 11-20'],
+      questions: ['How old are you?', 'What is your age?'],
+    }
+  );
+
+  window.LX.lessonBodies['A0-BRG-L6'] = _mkBody(
+    'A0-BRG-L6', 'Familiar Objects: This Is a Bag, a Phone, a Key', 'A0',
+    'I can identify and name 15 common everyday objects.',
+    ['noun_singular', 'present_be_is'],
+    [
+      { w: 'bag', d: 'a container you carry', e: 'This is a bag.' },
+      { w: 'phone', d: 'a mobile device', e: 'This is a phone.' },
+      { w: 'key', d: 'opens a lock', e: 'This is a key.' },
+      { w: 'book', d: 'pages you read', e: 'This is a book.' },
+      { w: 'pen', d: 'for writing', e: 'This is a pen.' },
+      { w: 'bottle', d: 'a container for liquid', e: 'This is a bottle.' },
+      { w: 'wallet', d: 'holds money and cards', e: 'This is a wallet.' },
+    ],
+    ['This is a bag.', 'That is a phone.', 'It is a key.', 'What is this?', 'It is a book.'],
+    [
+      { p: 'What is this?', c: 'asking about an object', r: 'It is a bag.' },
+      { p: 'This is a pen.', c: 'pointing at an object', r: 'Yes, it is a pen.' },
+      { p: 'Is this a phone?', c: 'asking to confirm', r: 'Yes, it is.' },
+    ],
+    {
+      recognition: [
+        { id: 'r1', prompt: 'Which object do you write with?', options: ['bag', 'phone', 'pen', 'key'], correct: 2 },
+        { id: 'r2', prompt: 'Which sentence is correct?', options: ['This are a bag.', 'This is a bag.', 'This am a bag.', 'This be a bag.'], correct: 1 },
+      ],
+      matching: [
+        { id: 'm1', left: 'bag', right: 'carry things', correctRight: 'carry things' },
+        { id: 'm2', left: 'key', right: 'opens a lock', correctRight: 'opens a lock' },
+        { id: 'm3', left: 'pen', right: 'for writing', correctRight: 'for writing' },
+      ],
+      controlled: [
+        { id: 'c1', prompt: 'Write: This is a [object]. (choose: bag, phone, book)', answer: 'This is a bag.' },
+        { id: 'c2', prompt: 'Ask about an object: "What is ____?"', answer: 'What is this?' },
+      ],
+    },
+    {
+      setup: 'You are helping at the lost property office. Identify objects.',
+      turns: [
+        { speaker: 'Officer', text: 'What is this?' },
+        { speaker: 'You', options: ['It is a bag.', 'It is red.', 'I am Alex.'], correct: 0 },
+        { speaker: 'Officer', text: 'And this one?', media: 'phone' },
+        { speaker: 'You', options: ['It is a phone.', 'It is a bag.', 'It is a key.'], correct: 0 },
+      ],
+      partB: [
+        { frame: 'Describe a pen: "This is ___"', answer: 'This is a pen.' },
+        { frame: 'Ask about an object: "What is ___?"', answer: 'What is this?' },
+      ],
+    },
+    {
+      taskDescription: 'Describe objects on a table to your partner.',
+      studentHas: ['bag', 'phone', 'book'],
+      partnerHas: ['key', 'pen', 'wallet'],
+      questions: ['What is this?', 'Is it a phone?'],
+    }
+  );
+
+  window.LX.lessonBodies['A0-BRG-L7'] = _mkBody(
+    'A0-BRG-L7', 'Colours and Descriptions: The Bag Is Black', 'A0',
+    'I can name 8 colours and use them to describe objects.',
+    ['colour_adjectives', 'present_be_is'],
+    [
+      { w: 'red', d: 'the colour of fire', e: 'The bag is red.' },
+      { w: 'blue', d: 'the colour of the sky', e: 'It is a blue phone.' },
+      { w: 'green', d: 'the colour of grass', e: 'The pen is green.' },
+      { w: 'yellow', d: 'the colour of the sun', e: 'The book is yellow.' },
+      { w: 'black', d: 'the darkest colour', e: 'The bag is black.' },
+      { w: 'white', d: 'the lightest colour', e: 'The wall is white.' },
+      { w: 'orange', d: 'like an orange fruit', e: 'The bag is orange.' },
+      { w: 'pink', d: 'light red', e: 'The phone case is pink.' },
+    ],
+    ['The bag is black.', 'It is a red phone.', 'What colour is it?', 'The pen is blue and green.'],
+    [
+      { p: 'What colour is it?', c: 'asking about colour', r: 'It is red.' },
+      { p: 'The bag is black.', c: 'describing colour', r: 'Yes, a black bag.' },
+      { p: 'Is it blue or green?', c: 'asking to choose', r: 'It is blue.' },
+    ],
+    {
+      recognition: [
+        { id: 'r1', prompt: 'What colour is grass?', options: ['blue', 'red', 'green', 'yellow'], correct: 2 },
+        { id: 'r2', prompt: 'Which sentence is correct?', options: ['The bag black is.', 'The bag is black.', 'Black the bag is.', 'Is black the bag.'], correct: 1 },
+      ],
+      matching: [
+        { id: 'm1', left: 'red', right: 'colour of fire', correctRight: 'colour of fire' },
+        { id: 'm2', left: 'blue', right: 'colour of the sky', correctRight: 'colour of the sky' },
+        { id: 'm3', left: 'green', right: 'colour of grass', correctRight: 'colour of grass' },
+      ],
+      controlled: [
+        { id: 'c1', prompt: 'Describe a bag using a colour: "The bag is ___"', answer: 'The bag is black.' },
+        { id: 'c2', prompt: 'Ask about colour: "What colour is ___?"', answer: 'What colour is it?' },
+      ],
+    },
+    {
+      setup: 'You are describing objects at the lost property office.',
+      turns: [
+        { speaker: 'Officer', text: 'What colour is the bag?' },
+        { speaker: 'You', options: ['The bag is black.', 'The bag is a colour.', 'Bags are things.'], correct: 0 },
+        { speaker: 'Officer', text: 'And the phone?' },
+        { speaker: 'You', options: ['The phone is blue.', 'The phone is a bag.', 'Phone is blue is.'], correct: 0 },
+      ],
+      partB: [
+        { frame: 'Describe a green pen: "The pen is ___"', answer: 'The pen is green.' },
+        { frame: 'Ask about the colour of a book:', answer: 'What colour is the book?' },
+      ],
+    },
+    {
+      taskDescription: 'Describe objects by colour to your partner.',
+      studentHas: ['red bag', 'blue phone'],
+      partnerHas: ['green pen', 'yellow book'],
+      questions: ['What colour is the bag?', 'Is the phone blue or red?'],
+    }
+  );
+
+  window.LX.lessonBodies['A0-BRG-L8'] = _mkBody(
+    'A0-BRG-L8', 'I Am, You Are, It Is — My First Sentences', 'A0',
+    'I can use "I am", "you are", and "it is" in simple sentences.',
+    ['present_be_am', 'present_be_is', 'present_be_are'],
+    [
+      { w: 'am', d: 'to be (I)', e: 'I am Alex.' },
+      { w: 'is', d: 'to be (he/she/it)', e: 'It is a bag.' },
+      { w: 'are', d: 'to be (you/we/they)', e: 'You are a student.' },
+      { w: 'student', d: 'a person who studies', e: 'I am a student.' },
+      { w: 'teacher', d: 'a person who teaches', e: 'She is a teacher.' },
+    ],
+    ['I am Alex.', 'You are a student.', 'It is a bag.', 'She is my teacher.', 'We are in class.'],
+    [
+      { p: 'I am a student.', c: 'saying who you are', r: 'I am a teacher.' },
+      { p: 'You are very welcome.', c: 'welcoming someone', r: 'Thank you!' },
+      { p: 'It is a phone.', c: 'identifying something', r: 'Yes, it is.' },
+    ],
+    {
+      recognition: [
+        { id: 'r1', prompt: 'Which is correct for "I"?', options: ['I is', 'I are', 'I am', 'I be'], correct: 2 },
+        { id: 'r2', prompt: 'Which is correct for "it"?', options: ['It am', 'It is', 'It are', 'It be'], correct: 1 },
+      ],
+      matching: [
+        { id: 'm1', left: 'I ___', right: 'am', correctRight: 'am' },
+        { id: 'm2', left: 'You ___', right: 'are', correctRight: 'are' },
+        { id: 'm3', left: 'It ___', right: 'is', correctRight: 'is' },
+      ],
+      controlled: [
+        { id: 'c1', prompt: 'Complete: "I ___ a student."', answer: 'I am a student.' },
+        { id: 'c2', prompt: 'Complete: "It ___ a bag."', answer: 'It is a bag.' },
+      ],
+    },
+    {
+      setup: 'You introduce yourself and describe an object.',
+      turns: [
+        { speaker: 'Classmate', text: 'Are you a student?' },
+        { speaker: 'You', options: ['Yes, I am a student.', 'Yes, it is.', 'I am from France.'], correct: 0 },
+        { speaker: 'Classmate', text: 'What is that? Is it a phone?' },
+        { speaker: 'You', options: ['Yes, it is a phone.', 'I am a phone.', 'You are a phone.'], correct: 0 },
+      ],
+      partB: [
+        { frame: 'Complete: "I ___ 20 years old."', answer: 'I am 20 years old.' },
+        { frame: 'Complete: "You ___ a good student."', answer: 'You are a good student.' },
+      ],
+    },
+    {
+      taskDescription: 'Use am / is / are to describe yourself and objects.',
+      studentHas: ['I am ...', 'It is ...'],
+      partnerHas: ['You are ...', 'She/He is ...'],
+      questions: ['Are you a student?', 'What is it?'],
+    }
+  );
+
+  /* ═══════════════════════════════════════════════════════════════
+     A1 LESSON BODIES (Unit 1 expanded — 4 more published lessons)
+  ═══════════════════════════════════════════════════════════════ */
+
+  window.LX.lessonBodies['A1-U1-L1'] = _mkBody(
+    'A1-U1-L1', 'I Am … — Introducing Yourself with "to be"', 'A1',
+    'I can introduce myself using "to be" and say what I am and where I am from.',
+    ['present_be_am', 'present_be_is', 'name_exchange', 'country_expression'],
+    [
+      { w: 'introduce', d: 'to say who you are', e: 'Let me introduce myself.' },
+      { w: 'student', d: 'a person who studies', e: 'I am a student.' },
+      { w: 'engineer', d: 'a person who designs things', e: 'She is an engineer.' },
+      { w: 'married', d: 'having a husband or wife', e: 'I am married.' },
+      { w: 'single', d: 'not married', e: 'I am single.' },
+    ],
+    ['My name is Alex. I am from Spain. I am a student.', 'Are you a teacher? No, I am a student.', 'She is an engineer from Japan.'],
+    [
+      { p: 'Hi! I am [name].', c: 'introducing yourself', r: 'Nice to meet you, [name]!' },
+      { p: 'I am a [job].', c: 'saying your occupation', r: 'Oh, interesting!' },
+      { p: 'Are you [nationality]?', c: 'asking nationality', r: 'Yes, I am.' },
+    ],
+    {
+      recognition: [
+        { id: 'r1', prompt: 'Choose the correct sentence:', options: ['I are a student.', 'I am a student.', 'I is a student.', 'I be a student.'], correct: 1 },
+        { id: 'r2', prompt: 'She ___ an engineer.', options: ['am', 'is', 'are', 'be'], correct: 1 },
+      ],
+      matching: [
+        { id: 'm1', left: 'student', right: 'studies', correctRight: 'studies' },
+        { id: 'm2', left: 'teacher', right: 'teaches', correctRight: 'teaches' },
+        { id: 'm3', left: 'engineer', right: 'designs', correctRight: 'designs' },
+      ],
+      controlled: [
+        { id: 'c1', prompt: 'Introduce yourself: "My name is ___ . I am from ___ ."', answer: 'My name is Alex. I am from Spain.' },
+        { id: 'c2', prompt: 'Say your job: "I am a ___."', answer: 'I am a student.' },
+      ],
+    },
+    {
+      setup: 'You are at an international students\' meeting. Introduce yourself.',
+      turns: [
+        { speaker: 'Student', text: 'Hello! Are you new here?' },
+        { speaker: 'You', options: ['Yes, I am. My name is Alex.', 'No, it is.', 'She is a student.'], correct: 0 },
+        { speaker: 'Student', text: 'Nice to meet you! Are you a student?' },
+        { speaker: 'You', options: ['Yes, I am a student.', 'Yes, it is a student.', 'You are a student.'], correct: 0 },
+      ],
+      partB: [
+        { frame: 'Write a full self-introduction (name, country, job):', answer: 'My name is Alex. I am from Spain. I am a student.' },
+        { frame: 'Ask someone if they are a student:', answer: 'Are you a student?' },
+      ],
+    },
+    {
+      taskDescription: 'Introduce yourself to a new classmate and find out about them.',
+      studentHas: ['your name', 'your country', 'your job'],
+      partnerHas: ['their name', 'their country', 'their job'],
+      questions: ['What is your name?', 'Where are you from?', 'Are you a student?'],
+    }
+  );
+
+  window.LX.lessonBodies['A1-U1-L2'] = _mkBody(
+    'A1-U1-L2', 'He Is, She Is — Describing People', 'A1',
+    'I can describe people using "he is" and "she is".',
+    ['present_be_is', 'present_be_are'],
+    [
+      { w: 'tall', d: 'having great height', e: 'He is tall.' },
+      { w: 'short', d: 'not tall', e: 'She is short.' },
+      { w: 'young', d: 'not old', e: 'He is young.' },
+      { w: 'old', d: 'not young', e: 'She is old.' },
+      { w: 'friendly', d: 'kind and nice', e: 'He is friendly.' },
+    ],
+    ['He is tall and young.', 'She is a friendly teacher.', 'Is he from Italy?', 'They are students from Brazil.'],
+    [
+      { p: 'Who is he/she?', c: 'asking about a person', r: 'He is my brother. / She is my friend.' },
+      { p: 'Is he/she [adjective]?', c: 'asking for description', r: 'Yes, he/she is.' },
+    ],
+    {
+      recognition: [
+        { id: 'r1', prompt: 'He ___ tall.', options: ['am', 'is', 'are', 'be'], correct: 1 },
+        { id: 'r2', prompt: 'She ___ a teacher.', options: ['am', 'are', 'is', 'be'], correct: 2 },
+      ],
+      matching: [
+        { id: 'm1', left: 'tall', right: 'opposite: short', correctRight: 'opposite: short' },
+        { id: 'm2', left: 'young', right: 'opposite: old', correctRight: 'opposite: old' },
+        { id: 'm3', left: 'friendly', right: 'kind', correctRight: 'kind' },
+      ],
+      controlled: [
+        { id: 'c1', prompt: 'Describe a male friend using two adjectives: "He is ___ and ___."', answer: 'He is tall and friendly.' },
+        { id: 'c2', prompt: 'Describe a female teacher: "She is a ___."', answer: 'She is a friendly teacher.' },
+      ],
+    },
+    {
+      setup: 'You are looking at photos and describing people.',
+      turns: [
+        { speaker: 'Friend', text: 'Who is this?' },
+        { speaker: 'You', options: ['He is my brother. He is tall.', 'It is a bag.', 'I am tall.'], correct: 0 },
+        { speaker: 'Friend', text: 'Is she your teacher?' },
+        { speaker: 'You', options: ['Yes, she is. She is very friendly.', 'Yes, I am.', 'No, he is.'], correct: 0 },
+      ],
+      partB: [
+        { frame: 'Describe a young woman: "She is ___"', answer: 'She is young and friendly.' },
+        { frame: 'Describe a tall man: "He is ___"', answer: 'He is tall.' },
+      ],
+    },
+    {
+      taskDescription: 'Describe a person from a photo to your partner.',
+      studentHas: ['description of Person A'],
+      partnerHas: ['description of Person B'],
+      questions: ['Who is she?', 'Is he tall?', 'Is she a student?'],
+    }
+  );
+
+  window.LX.lessonBodies['A1-U1-L3'] = _mkBody(
+    'A1-U1-L3', 'They Are, We Are — Groups and Plural Descriptions', 'A1',
+    'I can describe groups of people using "they are" and "we are".',
+    ['present_be_are'],
+    [
+      { w: 'they', d: 'a group of people/things', e: 'They are students.' },
+      { w: 'we', d: 'me and others', e: 'We are friends.' },
+      { w: 'classmates', d: 'people in your class', e: 'They are my classmates.' },
+      { w: 'group', d: 'several people together', e: 'We are a group.' },
+      { w: 'same', d: 'identical', e: 'We are the same age.' },
+    ],
+    ['They are students from Spain.', 'We are classmates.', 'Are they friends?', 'We are not teachers — we are students!'],
+    [
+      { p: 'Are they students?', c: 'asking about a group', r: 'Yes, they are.' },
+      { p: 'We are in the same class.', c: 'describing shared membership', r: 'Yes! We are classmates.' },
+    ],
+    {
+      recognition: [
+        { id: 'r1', prompt: 'They ___ from Japan.', options: ['am', 'is', 'are', 'be'], correct: 2 },
+        { id: 'r2', prompt: 'We ___ students.', options: ['am', 'is', 'are', 'be'], correct: 2 },
+      ],
+      matching: [
+        { id: 'm1', left: 'I', right: 'am', correctRight: 'am' },
+        { id: 'm2', left: 'She', right: 'is', correctRight: 'is' },
+        { id: 'm3', left: 'They', right: 'are', correctRight: 'are' },
+      ],
+      controlled: [
+        { id: 'c1', prompt: 'Describe a group of friends: "They are ___."', answer: 'They are friends.' },
+        { id: 'c2', prompt: 'Describe yourself and a classmate: "We are ___."', answer: 'We are classmates.' },
+      ],
+    },
+    {
+      setup: 'You are introducing your group at a class presentation.',
+      turns: [
+        { speaker: 'Teacher', text: 'Tell me about your group.' },
+        { speaker: 'You', options: ['We are five students. We are from different countries.', 'They are bags.', 'I am from Spain.'], correct: 0 },
+        { speaker: 'Teacher', text: 'Are they all beginners?' },
+        { speaker: 'You', options: ['Yes, they are all beginners.', 'Yes, I am.', 'No, it is.'], correct: 0 },
+      ],
+      partB: [
+        { frame: 'Describe your class: "We are ___"', answer: 'We are students.' },
+        { frame: 'Talk about another group: "They are ___"', answer: 'They are from different countries.' },
+      ],
+    },
+    {
+      taskDescription: 'Describe your group and another group to your partner.',
+      studentHas: ['info about Group A'],
+      partnerHas: ['info about Group B'],
+      questions: ['Are they from Japan?', 'How many students are in the group?'],
+    }
+  );
+
+  /* ═══════════════════════════════════════════════════════════════
+     A2 LESSON BODIES (Units 1–2 — first 4 lessons each published)
+  ═══════════════════════════════════════════════════════════════ */
+
+  window.LX.lessonBodies['A2-U1-L1'] = _mkBody(
+    'A2-U1-L1', 'Yesterday I Worked — Regular Past Simple', 'A2',
+    'I can talk about completed past actions using regular past simple verbs.',
+    ['past_simple_regular', 'time_expressions_past'],
+    [
+      { w: 'worked', d: 'past of work', e: 'I worked yesterday.' },
+      { w: 'walked', d: 'past of walk', e: 'She walked to school.' },
+      { w: 'talked', d: 'past of talk', e: 'We talked for an hour.' },
+      { w: 'yesterday', d: 'the day before today', e: 'Yesterday I studied English.' },
+      { w: 'last', d: 'most recent', e: 'Last week I worked a lot.' },
+    ],
+    ['I worked yesterday.', 'She walked to the station.', 'We talked for two hours.', 'Last week, I studied English every day.'],
+    [
+      { p: 'What did you do yesterday?', c: 'asking about the past', r: 'I worked / studied / cooked …' },
+      { p: 'I worked all day.', c: 'describing past work', r: 'That sounds busy!' },
+    ],
+    {
+      recognition: [
+        { id: 'r1', prompt: 'Past of "work"?', options: ['works', 'worked', 'working', 'work'], correct: 1 },
+        { id: 'r2', prompt: 'Which sentence uses the past?', options: ['I work now.', 'I worked yesterday.', 'I am working.', 'I will work.'], correct: 1 },
+      ],
+      matching: [
+        { id: 'm1', left: 'talk', right: 'talked', correctRight: 'talked' },
+        { id: 'm2', left: 'walk', right: 'walked', correctRight: 'walked' },
+        { id: 'm3', left: 'study', right: 'studied', correctRight: 'studied' },
+      ],
+      controlled: [
+        { id: 'c1', prompt: 'Write: Yesterday I ___ (work).', answer: 'Yesterday I worked.' },
+        { id: 'c2', prompt: 'Write: Last week she ___ (study).', answer: 'Last week she studied.' },
+      ],
+    },
+    {
+      setup: 'You are talking to a friend about your day yesterday.',
+      turns: [
+        { speaker: 'Friend', text: 'What did you do yesterday?' },
+        { speaker: 'You', options: ['I worked at home and studied English.', 'I work at home.', 'I will work tomorrow.'], correct: 0 },
+        { speaker: 'Friend', text: 'Did you watch TV?' },
+        { speaker: 'You', options: ['Yes, I watched a film in the evening.', 'Yes, I watch TV.', 'No, I am watching.'], correct: 0 },
+      ],
+      partB: [
+        { frame: 'Write what you did yesterday (use past simple):', answer: 'Yesterday I worked and cooked dinner.' },
+        { frame: 'Write what you did last weekend:', answer: 'Last weekend I walked in the park.' },
+      ],
+    },
+    {
+      taskDescription: 'Ask your partner about their activities yesterday.',
+      studentHas: ['your activities (morning/afternoon)'],
+      partnerHas: ['their activities (morning/afternoon)'],
+      questions: ['What did you do yesterday?', 'Did you work yesterday?'],
+    }
+  );
+
+  window.LX.lessonBodies['A2-U1-L2'] = _mkBody(
+    'A2-U1-L2', 'I Went, I Saw, I Had — Common Irregular Verbs', 'A2',
+    'I can use common irregular past verbs to talk about past experiences.',
+    ['past_simple_irregular'],
+    [
+      { w: 'went', d: 'past of go', e: 'I went to the market.' },
+      { w: 'saw', d: 'past of see', e: 'I saw a great film.' },
+      { w: 'had', d: 'past of have', e: 'I had lunch at 1pm.' },
+      { w: 'came', d: 'past of come', e: 'She came home at 8pm.' },
+      { w: 'ate', d: 'past of eat', e: 'We ate pizza.' },
+    ],
+    ['I went to the market on Saturday.', 'She saw a film and had dinner.', 'We came home late and ate pizza.'],
+    [
+      { p: 'Where did you go?', c: 'asking about movement', r: 'I went to the park / shops / gym …' },
+      { p: 'I saw a great film!', c: 'sharing an experience', r: 'Really? What was it about?' },
+    ],
+    {
+      recognition: [
+        { id: 'r1', prompt: 'Past of "go"?', options: ['goed', 'gone', 'went', 'going'], correct: 2 },
+        { id: 'r2', prompt: 'Past of "see"?', options: ['seed', 'saw', 'seen', 'seeing'], correct: 1 },
+      ],
+      matching: [
+        { id: 'm1', left: 'go', right: 'went', correctRight: 'went' },
+        { id: 'm2', left: 'see', right: 'saw', correctRight: 'saw' },
+        { id: 'm3', left: 'eat', right: 'ate', correctRight: 'ate' },
+      ],
+      controlled: [
+        { id: 'c1', prompt: 'Write: I ___ (go) to the gym yesterday.', answer: 'I went to the gym yesterday.' },
+        { id: 'c2', prompt: 'Write: She ___ (see) an interesting film.', answer: 'She saw an interesting film.' },
+      ],
+    },
+    {
+      setup: 'You are telling a friend about your weekend.',
+      turns: [
+        { speaker: 'Friend', text: 'How was your weekend?' },
+        { speaker: 'You', options: ['It was great! I went to the beach and saw a concert.', 'I go to the beach.', 'I am going to the beach.'], correct: 0 },
+        { speaker: 'Friend', text: 'Did you eat out?' },
+        { speaker: 'You', options: ['Yes, I ate at a lovely Italian restaurant.', 'Yes, I eat pizza.', 'Yes, I will eat out.'], correct: 0 },
+      ],
+      partB: [
+        { frame: 'Write about your weekend (use went, saw, ate, had):', answer: 'I went to the park. I saw my friends. We had coffee.' },
+        { frame: 'Write: I came home and ___:', answer: 'I came home and ate dinner.' },
+      ],
+    },
+    {
+      taskDescription: 'Tell your partner about your last weekend using irregular verbs.',
+      studentHas: ['your weekend activities'],
+      partnerHas: ['their weekend activities'],
+      questions: ['Where did you go?', 'What did you eat?', 'Who did you see?'],
+    }
+  );
+
+  window.LX.lessonBodies['A2-U1-L3'] = _mkBody(
+    'A2-U1-L3', 'Did You …? — Past Simple Questions', 'A2',
+    'I can ask and answer questions about past events using "Did you …?"',
+    ['past_simple_questions', 'did_auxiliary'],
+    [
+      { w: 'did', d: 'past auxiliary verb', e: 'Did you work yesterday?' },
+      { w: 'enjoy', d: 'to like', e: 'Did you enjoy the film?' },
+      { w: 'travel', d: 'to go to another place', e: 'Did you travel last year?' },
+      { w: 'visit', d: 'to go to see a person or place', e: 'Did you visit your family?' },
+    ],
+    ['Did you work yesterday?', 'Yes, I did. / No, I didn\'t.', 'Did she enjoy the film?', 'What did you do?'],
+    [
+      { p: 'Did you enjoy the weekend?', c: 'asking about the past', r: 'Yes, I did! / No, I didn\'t.' },
+      { p: 'What did you do last night?', c: 'asking for information', r: 'I studied / watched TV / cooked …' },
+    ],
+    {
+      recognition: [
+        { id: 'r1', prompt: 'How do you form a past question?', options: ['Do you went?', 'Did you go?', 'Are you went?', 'You did go?'], correct: 1 },
+        { id: 'r2', prompt: 'What is the short answer (positive)?', options: ['Yes, I was.', 'Yes, I did.', 'Yes, I do.', 'Yes, I have.'], correct: 1 },
+      ],
+      matching: [
+        { id: 'm1', left: 'Did you enjoy it?', right: 'Yes, I did.', correctRight: 'Yes, I did.' },
+        { id: 'm2', left: 'What did you do?', right: 'I went to the park.', correctRight: 'I went to the park.' },
+        { id: 'm3', left: 'Did she call?', right: 'No, she didn\'t.', correctRight: 'No, she didn\'t.' },
+      ],
+      controlled: [
+        { id: 'c1', prompt: 'Form a question: ___ you visit your family?', answer: 'Did you visit your family?' },
+        { id: 'c2', prompt: 'Give a positive short answer: "Yes, I ___."', answer: 'Yes, I did.' },
+      ],
+    },
+    {
+      setup: 'You are asking a friend about their holidays.',
+      turns: [
+        { speaker: 'Friend', text: 'I had a lovely holiday!' },
+        { speaker: 'You', options: ['Did you travel far?', 'Do you travel?', 'Are you travelling?'], correct: 0 },
+        { speaker: 'Friend', text: 'Yes! I went to Portugal. Did you go anywhere?' },
+        { speaker: 'You', options: ['No, I didn\'t. I stayed at home.', 'No, I don\'t go.', 'No, I am not going.'], correct: 0 },
+      ],
+      partB: [
+        { frame: 'Ask your partner if they enjoyed the weekend:', answer: 'Did you enjoy the weekend?' },
+        { frame: 'Ask what they did last night:', answer: 'What did you do last night?' },
+      ],
+    },
+    {
+      taskDescription: 'Interview your partner about their last holiday using Did you … questions.',
+      studentHas: ['questions to ask'],
+      partnerHas: ['answers about their holiday'],
+      questions: ['Did you travel?', 'Did you enjoy it?', 'What did you do?'],
+    }
+  );
+
+  window.LX.lessonBodies['A2-U1-L4'] = _mkBody(
+    'A2-U1-L4', 'I Didn\'t … — Past Simple Negative', 'A2',
+    'I can make negative statements about the past using "didn\'t".',
+    ['past_simple_negative', 'did_auxiliary'],
+    [
+      { w: 'didn\'t', d: 'did not (negative past)', e: 'I didn\'t work yesterday.' },
+      { w: 'forgot', d: 'past of forget', e: 'I forgot my phone.' },
+      { w: 'miss', d: 'to not be somewhere', e: 'I didn\'t miss the bus.' },
+      { w: 'unfortunately', d: 'sadly', e: 'Unfortunately, I didn\'t finish.' },
+    ],
+    ['I didn\'t work yesterday.', 'She didn\'t come to class.', 'We didn\'t eat dinner.', 'He didn\'t enjoy the film.'],
+    [
+      { p: 'I didn\'t have time.', c: 'explaining a negative', r: 'That\'s OK!' },
+      { p: 'She didn\'t call me.', c: 'describing what didn\'t happen', r: 'Oh, that\'s strange.' },
+    ],
+    {
+      recognition: [
+        { id: 'r1', prompt: 'Which is the correct negative past?', options: ['I not worked.', 'I didn\'t worked.', 'I didn\'t work.', 'I no worked.'], correct: 2 },
+        { id: 'r2', prompt: '"Didn\'t" is short for:', options: ['do not', 'does not', 'did not', 'doing not'], correct: 2 },
+      ],
+      matching: [
+        { id: 'm1', left: 'I worked.', right: 'I didn\'t work.', correctRight: 'I didn\'t work.' },
+        { id: 'm2', left: 'She went.', right: 'She didn\'t go.', correctRight: 'She didn\'t go.' },
+        { id: 'm3', left: 'They ate.', right: 'They didn\'t eat.', correctRight: 'They didn\'t eat.' },
+      ],
+      controlled: [
+        { id: 'c1', prompt: 'Make negative: "I worked yesterday." → "I ___ yesterday."', answer: 'I didn\'t work yesterday.' },
+        { id: 'c2', prompt: 'Write: She ___ (not enjoy) the film.', answer: 'She didn\'t enjoy the film.' },
+      ],
+    },
+    {
+      setup: 'You are explaining to your teacher why your homework isn\'t done.',
+      turns: [
+        { speaker: 'Teacher', text: 'Did you do your homework?' },
+        { speaker: 'You', options: ['No, I didn\'t. I didn\'t have time.', 'No, I don\'t do homework.', 'No, I am not doing it.'], correct: 0 },
+        { speaker: 'Teacher', text: 'Did you study last night?' },
+        { speaker: 'You', options: ['I studied a little, but I didn\'t finish.', 'I study a little.', 'I am studying.'], correct: 0 },
+      ],
+      partB: [
+        { frame: 'Explain something you didn\'t do yesterday:', answer: 'I didn\'t go to the gym yesterday.' },
+        { frame: 'Write a negative sentence about last weekend:', answer: 'I didn\'t travel last weekend.' },
+      ],
+    },
+    {
+      taskDescription: 'Tell your partner three things you didn\'t do last week.',
+      studentHas: ['your negative sentences'],
+      partnerHas: ['their negative sentences'],
+      questions: ['What didn\'t you do?', 'Why didn\'t you …?'],
+    }
+  );
+
+  window.LX.lessonBodies['A2-U2-L1'] = _mkBody(
+    'A2-U2-L1', 'I\'m Going to … — Plans with "going to"', 'A2',
+    'I can talk about future plans and intentions using "going to".',
+    ['future_going_to'],
+    [
+      { w: 'plan', d: 'something you intend to do', e: 'I have a plan for the weekend.' },
+      { w: 'intend', d: 'to mean to do', e: 'I intend to study more.' },
+      { w: 'weekend', d: 'Saturday and Sunday', e: 'What are you doing this weekend?' },
+      { w: 'holiday', d: 'time off work or study', e: 'I\'m going to take a holiday.' },
+    ],
+    ['I\'m going to study tonight.', 'She\'s going to visit her family.', 'Are you going to work tomorrow?', 'We\'re going to have a great time!'],
+    [
+      { p: 'What are you going to do?', c: 'asking about plans', r: 'I\'m going to …' },
+      { p: 'I\'m going to learn to drive.', c: 'stating a plan', r: 'That\'s exciting!' },
+    ],
+    {
+      recognition: [
+        { id: 'r1', prompt: 'Which shows a future plan?', options: ['I went to the gym.', 'I go to the gym.', 'I\'m going to go to the gym.', 'I am at the gym.'], correct: 2 },
+        { id: 'r2', prompt: '"Going to" is used for:', options: ['past actions', 'present facts', 'future plans', 'habits'], correct: 2 },
+      ],
+      matching: [
+        { id: 'm1', left: 'I', right: 'I\'m going to', correctRight: 'I\'m going to' },
+        { id: 'm2', left: 'She', right: 'She\'s going to', correctRight: 'She\'s going to' },
+        { id: 'm3', left: 'They', right: 'They\'re going to', correctRight: 'They\'re going to' },
+      ],
+      controlled: [
+        { id: 'c1', prompt: 'Write a plan for this evening: "I\'m going to ___."', answer: 'I\'m going to cook dinner.' },
+        { id: 'c2', prompt: 'Ask someone their plan: "What are you going to ___?"', answer: 'What are you going to do?' },
+      ],
+    },
+    {
+      setup: 'You are discussing weekend plans with a colleague.',
+      turns: [
+        { speaker: 'Colleague', text: 'Any plans for the weekend?' },
+        { speaker: 'You', options: ['Yes! I\'m going to visit my family.', 'Yes, I visited my family.', 'Yes, I visit my family.'], correct: 0 },
+        { speaker: 'Colleague', text: 'Sounds great! Are you going to stay the whole weekend?' },
+        { speaker: 'You', options: ['Yes, I\'m going to stay until Sunday.', 'Yes, I stayed until Sunday.', 'Yes, I stay until Sunday.'], correct: 0 },
+      ],
+      partB: [
+        { frame: 'Write your plan for next weekend:', answer: 'I\'m going to relax and see some friends.' },
+        { frame: 'Ask a friend about their summer plans:', answer: 'What are you going to do this summer?' },
+      ],
+    },
+    {
+      taskDescription: 'Share your plans for next week with your partner.',
+      studentHas: ['your plans for Monday-Wednesday'],
+      partnerHas: ['their plans for Thursday-Friday'],
+      questions: ['What are you going to do?', 'Are you going to work?', 'When are you going to …?'],
+    }
+  );
+
+  window.LX.lessonBodies['A2-U2-L2'] = _mkBody(
+    'A2-U2-L2', 'I\'ll Help You — Spontaneous Decisions with "will"', 'A2',
+    'I can use "will" to offer help and make spontaneous decisions.',
+    ['future_will_spontaneous'],
+    [
+      { w: 'offer', d: 'to say you will do something for someone', e: 'I\'ll carry that for you.' },
+      { w: 'spontaneous', d: 'decided at that moment', e: 'It\'s cold. I\'ll close the window.' },
+      { w: 'carry', d: 'to hold and transport', e: 'I\'ll carry your bag.' },
+      { w: 'decision', d: 'a choice you make', e: 'I\'ll have the coffee, please.' },
+    ],
+    ['I\'ll help you with that.', 'Don\'t worry, I\'ll do it.', 'I think I\'ll have the soup.', 'It\'s cold — I\'ll close the window.'],
+    [
+      { p: 'I\'ll help you.', c: 'offering help', r: 'Thank you so much!' },
+      { p: 'Can you help me?', c: 'asking for help', r: 'Of course, I\'ll do it now.' },
+    ],
+    {
+      recognition: [
+        { id: 'r1', prompt: 'Which is a spontaneous decision with will?', options: ['I\'m going to cook tonight.', 'I cooked last night.', 'I\'ll cook now — you look hungry!', 'I cook every day.'], correct: 2 },
+        { id: 'r2', prompt: '"I\'ll" is short for:', options: ['I will', 'I am', 'I would', 'I have'], correct: 0 },
+      ],
+      matching: [
+        { id: 'm1', left: 'It\'s cold.', right: 'I\'ll close the window.', correctRight: 'I\'ll close the window.' },
+        { id: 'm2', left: 'I\'m thirsty.', right: 'I\'ll get some water.', correctRight: 'I\'ll get some water.' },
+        { id: 'm3', left: 'The phone is ringing.', right: 'I\'ll answer it.', correctRight: 'I\'ll answer it.' },
+      ],
+      controlled: [
+        { id: 'c1', prompt: 'Offer to help: "Don\'t worry, I\'ll ___."', answer: 'Don\'t worry, I\'ll do it.' },
+        { id: 'c2', prompt: 'Make a spontaneous decision: "It\'s hot. I\'ll ___."', answer: 'It\'s hot. I\'ll open the window.' },
+      ],
+    },
+    {
+      setup: 'You are at a friend\'s house helping them with dinner.',
+      turns: [
+        { speaker: 'Friend', text: 'I have so much to do!' },
+        { speaker: 'You', options: ['Don\'t worry! I\'ll help you.', 'Don\'t worry, I helped you.', 'Don\'t worry, I help you.'], correct: 0 },
+        { speaker: 'Friend', text: 'Can you set the table?' },
+        { speaker: 'You', options: ['Of course! I\'ll do it now.', 'Of course, I do it.', 'Of course, I did it.'], correct: 0 },
+      ],
+      partB: [
+        { frame: 'Offer to carry something heavy: "I\'ll ___"', answer: 'I\'ll carry that for you.' },
+        { frame: 'Make a decision when you see the menu: "I think I\'ll ___"', answer: 'I think I\'ll have the fish.' },
+      ],
+    },
+    {
+      taskDescription: 'Role-play: one person needs help, the other offers to help using will.',
+      studentHas: ['tasks you need help with'],
+      partnerHas: ['offers to help'],
+      questions: ['Can you help me?', 'I\'ll do it — is that OK?'],
+    }
+  );
+
+  window.LX.lessonBodies['A2-U2-L3'] = _mkBody(
+    'A2-U2-L3', 'It Will Be Cold — Predictions with "will"', 'A2',
+    'I can make predictions about the future using "will".',
+    ['future_will_prediction'],
+    [
+      { w: 'predict', d: 'to say what will happen', e: 'I predict it will rain.' },
+      { w: 'probably', d: 'likely to be true', e: 'It will probably be sunny.' },
+      { w: 'weather', d: 'rain, sun, wind etc.', e: 'The weather will be cold.' },
+      { w: 'think', d: 'to believe', e: 'I think she will come.' },
+    ],
+    ['I think it will rain.', 'It will probably be cold tomorrow.', 'She will do well in the exam.', 'I don\'t think it will be easy.'],
+    [
+      { p: 'What will the weather be like?', c: 'asking for a prediction', r: 'I think it will be sunny.' },
+      { p: 'Do you think he will pass?', c: 'asking for an opinion', r: 'I think he will. He\'s very good.' },
+    ],
+    {
+      recognition: [
+        { id: 'r1', prompt: 'Which is a prediction?', options: ['It rained yesterday.', 'I think it will rain tomorrow.', 'It is raining now.', 'It rains in winter.'], correct: 1 },
+        { id: 'r2', prompt: '"I don\'t think it will be easy" means:', options: ['It is easy.', 'It was easy.', 'I predict it will not be easy.', 'It might be easy.'], correct: 2 },
+      ],
+      matching: [
+        { id: 'm1', left: 'I think...', right: 'prediction with opinion', correctRight: 'prediction with opinion' },
+        { id: 'm2', left: 'probably', right: 'not 100% certain', correctRight: 'not 100% certain' },
+        { id: 'm3', left: 'will rain', right: 'future prediction', correctRight: 'future prediction' },
+      ],
+      controlled: [
+        { id: 'c1', prompt: 'Make a weather prediction: "I think it will ___."', answer: 'I think it will rain.' },
+        { id: 'c2', prompt: 'Make a negative prediction: "I don\'t think it will ___."', answer: 'I don\'t think it will be sunny.' },
+      ],
+    },
+    {
+      setup: 'You and a friend are planning a trip and discussing the weather.',
+      turns: [
+        { speaker: 'Friend', text: 'What do you think the weather will be like?' },
+        { speaker: 'You', options: ['I think it will be sunny and warm.', 'I think it was sunny.', 'I think it is sunny.'], correct: 0 },
+        { speaker: 'Friend', text: 'Do you think it will rain?' },
+        { speaker: 'You', options: ['Probably not. I don\'t think it will rain.', 'Yes, it rained.', 'Yes, it is raining.'], correct: 0 },
+      ],
+      partB: [
+        { frame: 'Predict the weather for tomorrow:', answer: 'I think it will be cold and cloudy.' },
+        { frame: 'Predict an outcome: "I think he will ___."', answer: 'I think he will pass the exam.' },
+      ],
+    },
+    {
+      taskDescription: 'Make three predictions about next year. Share with your partner.',
+      studentHas: ['your three predictions'],
+      partnerHas: ['their three predictions'],
+      questions: ['What do you think will happen?', 'Do you agree with my prediction?'],
+    }
+  );
+
+  window.LX.lessonBodies['A2-U2-L4'] = _mkBody(
+    'A2-U2-L4', 'What Are Your Plans? — Discussing Future Arrangements', 'A2',
+    'I can discuss future plans and arrangements using "going to" and present continuous.',
+    ['future_going_to', 'present_continuous_future'],
+    [
+      { w: 'arrangement', d: 'a plan you have made', e: 'I have an arrangement on Friday.' },
+      { w: 'meeting', d: 'a planned gathering', e: 'I\'m meeting my friends on Saturday.' },
+      { w: 'free', d: 'not busy', e: 'Are you free this evening?' },
+      { w: 'busy', d: 'having a lot to do', e: 'I\'m busy on Monday.' },
+    ],
+    ['I\'m meeting my friends on Saturday.', 'Are you free tomorrow?', 'I\'m going to the cinema tonight.', 'I\'m busy — I\'ve got a meeting.'],
+    [
+      { p: 'Are you free this weekend?', c: 'asking about availability', r: 'Yes, I am! / No, I\'m busy.' },
+      { p: 'What are you doing tonight?', c: 'asking about plans', r: 'I\'m going to the gym.' },
+    ],
+    {
+      recognition: [
+        { id: 'r1', prompt: 'Which shows a fixed future arrangement?', options: ['I go on Saturday.', 'I went on Saturday.', 'I\'m meeting my friends on Saturday.', 'I meet my friends.'], correct: 2 },
+        { id: 'r2', prompt: 'How do you ask if someone is available?', options: ['When are you?', 'Are you free tomorrow?', 'What is your plan?', 'Do you have tomorrow?'], correct: 1 },
+      ],
+      matching: [
+        { id: 'm1', left: 'Are you free?', right: 'asking about availability', correctRight: 'asking about availability' },
+        { id: 'm2', left: 'I\'m busy.', right: 'not available', correctRight: 'not available' },
+        { id: 'm3', left: 'I\'m meeting someone.', right: 'fixed arrangement', correctRight: 'fixed arrangement' },
+      ],
+      controlled: [
+        { id: 'c1', prompt: 'Ask if someone is free: "Are you ___ this weekend?"', answer: 'Are you free this weekend?' },
+        { id: 'c2', prompt: 'Explain you are busy: "I\'m busy — I\'ve got ___."', answer: 'I\'m busy — I\'ve got a meeting.' },
+      ],
+    },
+    {
+      setup: 'You are trying to arrange to meet a friend next week.',
+      turns: [
+        { speaker: 'Friend', text: 'Are you free on Thursday?' },
+        { speaker: 'You', options: ['No, I\'m busy. I\'ve got a meeting.', 'No, I was busy.', 'No, I am free.'], correct: 0 },
+        { speaker: 'Friend', text: 'What about Friday evening?' },
+        { speaker: 'You', options: ['Yes! I\'m free. Let\'s meet at 7.', 'Yes, I met someone.', 'Yes, I was free.'], correct: 0 },
+      ],
+      partB: [
+        { frame: 'Say you are busy on Monday: "I\'m busy on Monday — I\'m ___."', answer: 'I\'m busy on Monday — I\'m working.' },
+        { frame: 'Suggest meeting: "Are you free ___?"', answer: 'Are you free on Wednesday evening?' },
+      ],
+    },
+    {
+      taskDescription: 'Use a diary grid to find a time to meet your partner next week.',
+      studentHas: ['your diary for next week'],
+      partnerHas: ['their diary for next week'],
+      questions: ['Are you free on …?', 'What are you doing on …?'],
+    }
+  );
+
   /* ═══════════════════════════════════════════════════════════════
      LEVEL  A0  —  Pre-A1 / Foundation
      Structure:
@@ -150,30 +1284,30 @@
         'needed to enter the A1 path. All 10 lessons are P0 launch-critical.',
       launchPriority: 'P0',
       lessons: [
-        p0('A0-BRG-L1', 'Welcome to LinguaX: Platform & Classroom English', 20, 'education_study',
+        pub('A0-BRG-L1', 'Welcome to LinguaX: Platform & Classroom English', 20, 'education_study',
           ['imperative_basic', 'greeting_formulaic'],
-          'I can follow platform instructions and understand classroom language.'),
-        p0('A0-BRG-L2', 'Hello and Goodbye: Greetings and Farewells', 20, 'personal_life',
+          'I can follow platform instructions and understand classroom language.', 'A0', 'A0-BRG-L1'),
+        pub('A0-BRG-L2', 'Hello and Goodbye: Greetings and Farewells', 20, 'personal_life',
           ['greeting_formulaic', 'polite_formulaic'],
-          'I can greet people and say goodbye using set phrases.'),
-        p0('A0-BRG-L3', 'What Is Your Name? — Introductions', 20, 'personal_life',
+          'I can greet people and say goodbye using set phrases.', 'A0', 'A0-BRG-L2'),
+        pub('A0-BRG-L3', 'What Is Your Name? — Introductions', 20, 'personal_life',
           ['name_exchange'],
-          'I can give my name and ask someone else their name.'),
-        p0('A0-BRG-L4', 'Where Are You From? — Nationality and Country', 20, 'personal_life',
+          'I can give my name and ask someone else their name.', 'A0', 'A0-BRG-L3'),
+        pub('A0-BRG-L4', 'Where Are You From? — Nationality and Country', 20, 'personal_life',
           ['country_expression', 'name_exchange'],
-          'I can say where I am from and understand country names.'),
-        p0('A0-BRG-L5', 'How Old Are You? — Age and Numbers 1–20', 20, 'personal_life',
+          'I can say where I am from and understand country names.', 'A0', 'A0-BRG-L4'),
+        pub('A0-BRG-L5', 'How Old Are You? — Age and Numbers 1–20', 20, 'personal_life',
           ['age_expression', 'cardinal_numbers'],
-          'I can say my age and understand numbers 1–20.'),
-        p0('A0-BRG-L6', 'Familiar Objects: This Is a Bag, a Phone, a Key', 20, 'personal_life',
+          'I can say my age and understand numbers 1–20.', 'A0', 'A0-BRG-L5'),
+        pub('A0-BRG-L6', 'Familiar Objects: This Is a Bag, a Phone, a Key', 20, 'personal_life',
           ['noun_singular', 'present_be_is'],
-          'I can identify and name 15 common everyday objects.'),
-        p0('A0-BRG-L7', 'Colours and Descriptions: The Bag Is Black', 20, 'personal_life',
+          'I can identify and name 15 common everyday objects.', 'A0', 'A0-BRG-L6'),
+        pub('A0-BRG-L7', 'Colours and Descriptions: The Bag Is Black', 20, 'personal_life',
           ['colour_adjectives', 'present_be_is'],
-          'I can name 8 colours and use them to describe objects.'),
-        p0('A0-BRG-L8', 'I Am, You Are, It Is — My First Sentences', 25, 'personal_life',
+          'I can name 8 colours and use them to describe objects.', 'A0', 'A0-BRG-L7'),
+        pub('A0-BRG-L8', 'I Am, You Are, It Is — My First Sentences', 25, 'personal_life',
           ['present_be_am', 'present_be_is', 'present_be_are'],
-          'I can use "I am", "you are", and "it is" in simple sentences.'),
+          'I can use "I am", "you are", and "it is" in simple sentences.', 'A0', 'A0-BRG-L8'),
         p0('A0-BRG-L9', 'My Alphabet: Spelling My Name', 20, 'personal_life',
           ['alphabet_recognition', 'alphabet_spelling'],
           'I can identify all 26 letters and spell my name aloud.'),
@@ -360,15 +1494,15 @@
         title: 'Me, My Things, and Basic Descriptions',
         description: 'The verb "to be" — describing yourself, your possessions, and the world immediately around you.',
         lessons: [
-          planned('A1-U1-L1', 'I Am … — Introducing Yourself with "to be"', 25, 'personal_life',
-            ['present_be_is', 'present_be_am'],
-            'I can introduce myself using "My name is …" and "I am …".'),
-          planned('A1-U1-L2', 'He Is, She Is — Describing People', 25, 'personal_life',
+          pub('A1-U1-L1', 'I Am … — Introducing Yourself with "to be"', 25, 'personal_life',
+            ['present_be_is', 'present_be_am', 'name_exchange', 'country_expression'],
+            'I can introduce myself using "My name is …" and "I am …".', 'A1', 'A1-U1-L1'),
+          pub('A1-U1-L2', 'He Is, She Is — Describing People', 25, 'personal_life',
             ['present_be_is'],
-            'I can describe a third person using "he is" and "she is" + adjective.'),
-          planned('A1-U1-L3', 'They Are, We Are — Groups and Plural Descriptions', 25, 'personal_life',
+            'I can describe a third person using "he is" and "she is" + adjective.', 'A1', 'A1-U1-L2'),
+          pub('A1-U1-L3', 'They Are, We Are — Groups and Plural Descriptions', 25, 'personal_life',
             ['present_be_are'],
-            'I can describe groups of people and things using "they are" and "we are".'),
+            'I can describe groups of people and things using "they are" and "we are".', 'A1', 'A1-U1-L3'),
           publishedAnchor(), /* ← A1-U1-L4: Lost Property — PUBLISHED */
           planned('A1-U1-L5', 'Is It …? — Yes/No Questions with "to be"', 25, 'community_public',
             ['be_question'],
@@ -605,17 +1739,18 @@
         title: 'Things I Did: Past Simple',
         description: 'Regular and irregular past simple for personal narratives and recent events.',
         lessons: [
-          planned('A2-U1-L1', 'Yesterday I Worked — Regular Past Simple', 25, 'personal_life',
-            ['past_simple_regular'], 'I can use regular past simple verbs with -ed.'),
-          planned('A2-U1-L2', 'I Went, I Saw, I Had — Common Irregular Verbs', 25, 'personal_life',
-            ['past_simple_irregular_group1'],
-            'I can use 15 common irregular past simple forms.'),
-          planned('A2-U1-L3', 'Did You …? — Past Simple Questions', 25, 'personal_life',
-            ['past_simple_question'],
-            'I can ask and answer past simple yes/no and Wh- questions.'),
-          planned('A2-U1-L4', 'I Didn\'t … — Past Simple Negative', 25, 'personal_life',
-            ['past_simple_negative'],
-            'I can make negative sentences in the past simple.'),
+          pub('A2-U1-L1', 'Yesterday I Worked — Regular Past Simple', 25, 'personal_life',
+            ['past_simple_regular', 'time_expressions_past'],
+            'I can use regular past simple verbs with -ed.', 'A2', 'A2-U1-L1'),
+          pub('A2-U1-L2', 'I Went, I Saw, I Had — Common Irregular Verbs', 25, 'personal_life',
+            ['past_simple_irregular'],
+            'I can use 15 common irregular past simple forms.', 'A2', 'A2-U1-L2'),
+          pub('A2-U1-L3', 'Did You …? — Past Simple Questions', 25, 'personal_life',
+            ['past_simple_questions', 'did_auxiliary'],
+            'I can ask and answer past simple yes/no and Wh- questions.', 'A2', 'A2-U1-L3'),
+          pub('A2-U1-L4', 'I Didn\'t … — Past Simple Negative', 25, 'personal_life',
+            ['past_simple_negative', 'did_auxiliary'],
+            'I can make negative sentences in the past simple.', 'A2', 'A2-U1-L4'),
           planned('A2-U1-L5', 'When Were You …? — Past of "to be"', 25, 'personal_life',
             ['past_be_was_were'],
             'I can use was/were for past states and descriptions.'),
@@ -629,15 +1764,15 @@
         title: 'Plans and Predictions: Future Language',
         description: '"Going to" for plans, "will" for spontaneous decisions and predictions.',
         lessons: [
-          planned('A2-U2-L1', 'I\'m Going to … — Plans with "going to"', 25, 'personal_life',
-            ['going_to_future'], 'I can talk about definite future plans.'),
-          planned('A2-U2-L2', 'I\'ll Help You — Spontaneous Decisions with "will"', 25, 'personal_life',
-            ['will_spontaneous'], 'I can make spontaneous offers and decisions using "will".'),
-          planned('A2-U2-L3', 'It Will Be Cold — Predictions with "will"', 25, 'personal_life',
-            ['will_prediction'], 'I can make simple predictions using "will".'),
-          planned('A2-U2-L4', 'What Are Your Plans? — Discussing Future Arrangements', 25, 'personal_life',
-            ['going_to_future', 'present_continuous_future'],
-            'I can discuss future plans using "going to" and present continuous.'),
+          pub('A2-U2-L1', 'I\'m Going to … — Plans with "going to"', 25, 'personal_life',
+            ['future_going_to'], 'I can talk about definite future plans.', 'A2', 'A2-U2-L1'),
+          pub('A2-U2-L2', 'I\'ll Help You — Spontaneous Decisions with "will"', 25, 'personal_life',
+            ['future_will_spontaneous'], 'I can make spontaneous offers and decisions using "will".', 'A2', 'A2-U2-L2'),
+          pub('A2-U2-L3', 'It Will Be Cold — Predictions with "will"', 25, 'personal_life',
+            ['future_will_prediction'], 'I can make simple predictions using "will".', 'A2', 'A2-U2-L3'),
+          pub('A2-U2-L4', 'What Are Your Plans? — Discussing Future Arrangements', 25, 'personal_life',
+            ['future_going_to', 'present_continuous_future'],
+            'I can discuss future plans using "going to" and present continuous.', 'A2', 'A2-U2-L4'),
           planned('A2-U2-L5', 'Next Year I\'m Going to … — Long-term Goals', 25, 'personal_life',
             ['going_to_future', 'time_expressions_future'],
             'I can describe long-term plans and ambitions.'),
@@ -2012,16 +3147,26 @@
    * @param {string}  lessonId
    * @param {object}  learnerProgress  — map of lessonId → { completed: bool, inProgress: bool, reviewDue: bool }
    *                                     Pass null/undefined for unauthenticated/anonymous state.
-   * @returns {string} COMING_SOON | LOCKED | READY | IN_PROGRESS | COMPLETED | REVIEW_DUE
+   * @param {string}  [currentPath]   — optional: learner's current path (e.g. 'A1', 'A2').
+   *                                     If set, lessons at a HIGHER level than currentPath are PATH_LOCKED.
+   * @returns {string} COMING_SOON | LOCKED | PATH_LOCKED | READY | IN_PROGRESS | COMPLETED | REVIEW_DUE
    */
-  function getLessonAvailability(lessonId, learnerProgress) {
+  function getLessonAvailability(lessonId, learnerProgress, currentPath) {
     var lesson = getLessonById(lessonId);
     if (!lesson) return 'COMING_SOON';
 
     /* Unpublished content is always COMING_SOON regardless of learner state */
     if (lesson.contentStatus !== 'PUBLISHED') return 'COMING_SOON';
 
-    /* No learner progress data → treat as READY for the first published lesson */
+    /* Path-gating: if currentPath is set, higher-level lessons are PATH_LOCKED */
+    if (currentPath) {
+      var lessonLevel = lesson.cefrLevel || _inferLevelFromId(lessonId);
+      if (lessonLevel && _levelIndex(lessonLevel) > _levelIndex(currentPath)) {
+        return 'PATH_LOCKED';
+      }
+    }
+
+    /* No learner progress data → treat as READY (first lesson always playable) */
     if (!learnerProgress) return 'READY';
 
     var lp = learnerProgress[lessonId] || {};
@@ -2032,12 +3177,31 @@
 
     /* Check prerequisites */
     var prereqs = getPrerequisites(lessonId);
+    /* No prerequisites → always READY */
+    if (prereqs.length === 0) return 'READY';
     var prereqsMet = prereqs.every(function (pid) {
+      /* If the prerequisite is PLANNED/unpublished, treat as met so we don't permanently lock */
+      var prereqLesson = getLessonById(pid);
+      if (!prereqLesson || prereqLesson.contentStatus !== 'PUBLISHED') return true;
       var pp = learnerProgress[pid] || {};
       return pp.completed === true;
     });
 
     return prereqsMet ? 'READY' : 'LOCKED';
+  }
+
+  /** Infer CEFR level from a lesson ID prefix (e.g. 'A0-BRG-L1' → 'A0') */
+  function _inferLevelFromId(lessonId) {
+    if (!lessonId) return null;
+    var match = lessonId.match(/^([A-C][0-2])/);
+    return match ? match[1] : null;
+  }
+
+  /** Return numeric index for a CEFR level for comparison */
+  function _levelIndex(level) {
+    return { 'A0': 0, 'A1': 1, 'A2': 2, 'B1': 3, 'B2': 4, 'C1': 5, 'C2': 6 }[level] !== undefined
+      ? { 'A0': 0, 'A1': 1, 'A2': 2, 'B1': 3, 'B2': 4, 'C1': 5, 'C2': 6 }[level]
+      : -1;
   }
 
   /** Return unit-level progress summary */
@@ -2150,6 +3314,8 @@
     getLessonAvailability:    getLessonAvailability,
     getUnitProgress:          getUnitProgress,
     getLevelProgress:         getLevelProgress,
+    inferLevelFromId:         _inferLevelFromId,
+    levelIndex:               _levelIndex,
     getReviewDueLessons:      getReviewDueLessons,
     getLessonsByScenario:     getLessonsByScenario,
     getLessonsByGrammarPoint: getLessonsByGrammarPoint,

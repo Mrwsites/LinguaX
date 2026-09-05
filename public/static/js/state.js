@@ -53,6 +53,12 @@
     // Compare mode
     compareAttemptIds: [null, null],
 
+    // Phase 2 Module E+ — Learner Profile & Placement
+    // currentPath is the learner's active CEFR path ('A0', 'A1', 'A2' or null).
+    // Null means placement test not yet taken.
+    currentPath: null,          // populated from localStorage on init
+    gateTestTarget: null,       // target level for #/gate-test/:level route
+
     // ── Stage status map (stageKey → STAGE_STATUS value) ──
     // This is the LIVE in-memory status for each stage in the current attempt.
     stageStatuses: {},

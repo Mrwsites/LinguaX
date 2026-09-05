@@ -42,6 +42,11 @@
     if (r.startsWith('/path')) return { view: 'path' };
     if (r.startsWith('/scenario/')) return { view: 'scenario', family: r.replace('/scenario/', '') };
 
+    // Phase 2 Module E+ routes
+    if (r.startsWith('/placement')) return { view: 'placement' };
+    if (r.startsWith('/change-path')) return { view: 'change_path' };
+    if (r.startsWith('/gate-test/')) return { view: 'gate_test', targetLevel: r.replace('/gate-test/', '').toUpperCase() };
+
     // attempts sub-routes — order matters: compare first, then lesson-specific history
     if (r.startsWith('/attempts/compare')) return { view: 'attempt_compare' };
 
@@ -92,6 +97,7 @@
         st.selectedAttemptId = parsed.attemptId;
       }
     }
+    if (parsed.targetLevel !== undefined) st.gateTestTarget = parsed.targetLevel;
   }
 
   function navigate(route) {
@@ -131,6 +137,9 @@
     else if (st.currentView === 'path')                 content.appendChild(renderPathView());
     else if (st.currentView === 'level_path')           content.appendChild(renderLevelPathView());
     else if (st.currentView === 'scenario')             content.appendChild(renderScenarioView());
+    else if (st.currentView === 'placement')            content.appendChild(renderPlacementTestView());
+    else if (st.currentView === 'change_path')          content.appendChild(renderChangePathView());
+    else if (st.currentView === 'gate_test')            content.appendChild(renderGateTestView(st.gateTestTarget));
     else content.appendChild(renderDashboard());
 
     main.appendChild(content);
@@ -187,11 +196,38 @@
   // ══════════════════════════════════════════════
   function renderDashboard() {
     const div = el('div');
+    const currentPath = P.getCurrentPath();
+
     div.innerHTML = `
     <div class="dashboard-header">
       <div class="dashboard-greeting">Good day,</div>
       <div class="dashboard-title">Your Learning Path 📚</div>
     </div>`;
+
+    // ── Placement banner (if no path assigned) ──
+    if (!currentPath) {
+      const banner = el('div', 'lx-placement-banner');
+      banner.innerHTML = `
+        <div class="lx-placement-banner-icon">🎯</div>
+        <div class="lx-placement-banner-text">
+          <strong>Not sure where to start?</strong>
+          Take a short placement test to find your ideal learning path (A0, A1, or A2).
+        </div>
+        <div class="lx-placement-banner-actions">
+          <button class="btn-start lx-placement-btn" id="placement-banner-btn">Take Placement Test</button>
+          <button class="btn-outline-sm lx-placement-skip-btn" id="placement-skip-btn">Start with A1</button>
+        </div>`;
+      div.appendChild(banner);
+    } else {
+      // ── Current path indicator ──
+      const pathBadge = el('div', 'lx-current-path-badge');
+      pathBadge.innerHTML = `
+        <span class="cefr-badge cefr-${currentPath.toLowerCase()}">${currentPath}</span>
+        <span class="lx-path-label">Current path: <strong>${_levelDisplayName(currentPath)}</strong></span>
+        <button class="btn-outline-sm lx-change-path-btn" id="change-path-dash-btn" aria-label="Change learning path">Change path</button>`;
+      div.appendChild(pathBadge);
+    }
+
     const grid = el('div', 'dashboard-grid');
     grid.appendChild(renderLessonCards());
     grid.appendChild(renderSidebar());
@@ -663,6 +699,7 @@
       COMPLETED:   { cls: 'lx-chip-completed',     icon: '✓', label: 'Completed' },
       REVIEW_DUE:  { cls: 'lx-chip-reviewdue',     icon: '⚡', label: 'Review due' },
       LOCKED:      { cls: 'lx-chip-locked',        icon: '🔒', label: 'Locked' },
+      PATH_LOCKED: { cls: 'lx-chip-pathlocked',    icon: '🔒', label: 'Gate test required' },
       COMING_SOON: { cls: 'lx-chip-comingsoon',    icon: '🕐', label: 'Planned' },
     };
     const d = map[avail] || map.COMING_SOON;
@@ -819,6 +856,8 @@
     const lp = _buildLearnerProgress();
     const path = curriculum.getPathByLevel(code);
     const levelProgress = curriculum.getLevelProgress(code, lp);
+    const currentPath = P.getCurrentPath();
+    const isPathLocked = currentPath && curriculum.levelIndex(code) > curriculum.levelIndex(currentPath);
 
     const div = el('div', 'lx-level-path-page-c');
 
@@ -832,9 +871,32 @@
         <span class="cefr-badge cefr-${code.toLowerCase()}" style="font-size:14px;padding:5px 14px">${code}</span>
         <h1 class="lx-lp-title">${_levelEmoji(code)} ${_levelDisplayName(code)}</h1>
         <span class="lx-priority-badge lx-pri-${(lvl && lvl.launchPriority || 'P1').toLowerCase()}">${lvl && lvl.launchPriority || 'P1'} ${lvl && lvl.launchPriority === 'P0' ? 'Launch' : ''}</span>
+        ${currentPath ? `<button class="btn-outline-sm lx-change-path-btn" id="change-path-path-btn" style="margin-left:auto" aria-label="Change learning path">Change path</button>` : ''}
       </div>
       ${lvl ? `<p class="lx-lp-purpose">${esc(lvl.levelPurpose || '').slice(0, 220)}${lvl.levelPurpose && lvl.levelPurpose.length > 220 ? '…' : ''}</p>` : ''}`;
     div.appendChild(header);
+
+    // ── Path-gating banner ──
+    if (isPathLocked) {
+      const gateBanner = el('div', 'lx-path-gate-banner');
+      gateBanner.innerHTML = `
+        <div class="lx-gate-banner-icon">🔒</div>
+        <div class="lx-gate-banner-text">
+          <strong>This path is for ${code} (${_levelDisplayName(code)}) learners.</strong><br>
+          You are currently on <span class="cefr-badge cefr-${currentPath.toLowerCase()}">${currentPath}</span>
+          <strong>${_levelDisplayName(currentPath)}</strong>.
+          To access ${code} lessons, take the ${code} gate test.
+        </div>
+        <div class="lx-gate-banner-actions">
+          <button class="btn-start lx-gate-test-btn" data-gate-level="${code}" id="gate-test-banner-btn">
+            Take ${code} Gate Test
+          </button>
+          <button class="nav-back-btn lx-gate-back-btn" id="gate-back-current-btn">
+            ← Back to my path (${currentPath})
+          </button>
+        </div>`;
+      div.appendChild(gateBanner);
+    }
 
     // ── Stats bar ──
     const statsBar = el('div', 'lx-lp-stats-bar');
@@ -914,7 +976,7 @@
         unitBody.setAttribute('role', 'region');
 
         unitLessons.forEach((lesson, li) => {
-          const avail = curriculum.getLessonAvailability(lesson.id, lp);
+          const avail = curriculum.getLessonAvailability(lesson.id, lp, currentPath);
           const fam = (LX.scenarioFamilies || []).find(f => f.id === lesson.scenarioFamily);
           const famLabel = fam ? fam.emoji + ' ' + fam.name : '';
 
@@ -926,7 +988,8 @@
 
           const isPublished = lesson.contentStatus === 'PUBLISHED';
           const isPlayable = isPublished && (avail === 'READY' || avail === 'IN_PROGRESS' || avail === 'COMPLETED' || avail === 'REVIEW_DUE');
-          const isLocked = avail === 'LOCKED';
+          const isLocked = avail === 'LOCKED' || avail === 'PATH_LOCKED';
+          const isPathLocked = avail === 'PATH_LOCKED';
           const isComingSoon = avail === 'COMING_SOON';
 
           // Get prereq title for locked tooltip
@@ -975,7 +1038,7 @@
               ${_availabilityChip(avail)}
               ${isPlayable ? `<span class="lx-lp-lesson-arrow">→</span>` : ''}
             </div>
-            ${isLocked ? `<div class="lx-lp-lock-msg" id="lock-msg-${lesson.id}" role="status" aria-live="polite" style="display:none">🔒 Complete "<strong>${esc(prereqTitle)}</strong>" first to unlock this lesson.</div>` : ''}
+            ${isPathLocked ? `<div class="lx-lp-lock-msg lx-lp-path-lock-msg" id="lock-msg-${lesson.id}" role="status" aria-live="polite" style="display:none">🔒 Take the gate test to unlock this path.</div>` : isLocked ? `<div class="lx-lp-lock-msg" id="lock-msg-${lesson.id}" role="status" aria-live="polite" style="display:none">🔒 Complete "<strong>${esc(prereqTitle)}</strong>" first to unlock this lesson.</div>` : ''}
             ${isComingSoon ? `<div class="lx-lp-planned-msg" id="planned-msg-${lesson.id}" role="status" aria-live="polite" style="display:none">🕐 This lesson is planned and will be available when it is created and published.</div>` : ''}`;
 
           unitBody.appendChild(rowEl);
@@ -3581,7 +3644,8 @@
             _startOrResumeLesson(false);
           }
         } else {
-          _showComingSoonModal('This lesson is published but the full lesson body is not yet available.');
+          // New lessons: show lesson overview modal
+          _showLessonPreviewModal(lid);
         }
       };
       row.addEventListener('click', action);
@@ -3623,6 +3687,73 @@
     // ── SCENARIO VIEW buttons ──
     const scenarioBackBtn = document.getElementById('scenario-back-btn');
     if (scenarioBackBtn) scenarioBackBtn.addEventListener('click', () => navigate(''));
+
+    // ── PLACEMENT TEST buttons ──
+    const placementBannerBtn = document.getElementById('placement-banner-btn');
+    if (placementBannerBtn) placementBannerBtn.addEventListener('click', () => navigate('/placement'));
+
+    const placementSkipBtn = document.getElementById('placement-skip-btn');
+    if (placementSkipBtn) placementSkipBtn.addEventListener('click', () => {
+      P.setCurrentPath('A1');
+      st.currentPath = 'A1';
+      navigate('');
+    });
+
+    const changePathDashBtn = document.getElementById('change-path-dash-btn');
+    if (changePathDashBtn) changePathDashBtn.addEventListener('click', () => navigate('/change-path'));
+
+    const changePathPathBtn = document.getElementById('change-path-path-btn');
+    if (changePathPathBtn) changePathPathBtn.addEventListener('click', () => navigate('/change-path'));
+
+    const placementBackBtn = document.getElementById('placement-back-btn');
+    if (placementBackBtn) placementBackBtn.addEventListener('click', () => navigate(''));
+
+    const changePathBackBtn = document.getElementById('change-path-back-btn');
+    if (changePathBackBtn) changePathBackBtn.addEventListener('click', () => navigate(''));
+
+    const gateTestBackBtn = document.getElementById('gate-test-back-btn');
+    if (gateTestBackBtn) gateTestBackBtn.addEventListener('click', () => navigate('/change-path'));
+
+    // Gate test launch buttons (data-gate-level)
+    $$('[data-gate-level]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const lvl = btn.dataset.gateLevel;
+        navigate('/gate-test/' + lvl);
+      });
+    });
+
+    // Change-path: move down buttons (no gate needed for moving down)
+    $$('.lx-path-move-down-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const lvl = btn.dataset.level;
+        if (lvl) {
+          P.setCurrentPath(lvl);
+          st.currentPath = lvl;
+          navigate('/path/' + lvl);
+        }
+      });
+    });
+
+    // Change-path: stay on current path
+    $$('.lx-path-stay-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const lvl = btn.dataset.level;
+        if (lvl) navigate('/path/' + lvl);
+      });
+    });
+
+    // Take placement from change-path
+    const cpTakePlacementBtn = document.getElementById('cp-take-placement-btn');
+    if (cpTakePlacementBtn) cpTakePlacementBtn.addEventListener('click', () => navigate('/placement'));
+
+    // Gate banner back button
+    const gateBackCurrentBtn = document.getElementById('gate-back-current-btn');
+    if (gateBackCurrentBtn) gateBackCurrentBtn.addEventListener('click', () => {
+      const cp = P.getCurrentPath();
+      if (cp) navigate('/path/' + cp);
+      else navigate('');
+    });
 
     // ── LESSON buttons ──
     const saveExitBtn = document.getElementById('save-exit-btn');
@@ -4649,8 +4780,475 @@
     render();
   }
 
+  // ══════════════════════════════════════════════════════════════════
+  // ── LESSON PREVIEW MODAL (for new published lessons) ──
+  // ══════════════════════════════════════════════════════════════════
+  function _showLessonPreviewModal(lessonId) {
+    const lesson = LX.curriculum.getLessonById(lessonId);
+    const body = window.LX.lessonBodies && window.LX.lessonBodies[lessonId];
+    if (!lesson) { _showComingSoonModal('Lesson not found.'); return; }
+
+    const existing = document.getElementById('lx-preview-modal');
+    if (existing) existing.remove();
+
+    const modal = el('div', 'lx-modal-overlay');
+    modal.id = 'lx-preview-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Lesson preview: ' + lesson.title);
+
+    const vocab = body && body.vocabulary ? body.vocabulary.slice(0, 5).map(v =>
+      `<div class="lx-preview-vocab-item"><strong>${esc(v.word)}</strong> — ${esc(v.definition)}</div>`
+    ).join('') : '';
+    const sentences = body && body.coreSentences ? body.coreSentences.slice(0, 4).map(s =>
+      `<div class="lx-preview-sentence">${esc(s.sentence)}</div>`
+    ).join('') : '';
+
+    modal.innerHTML = `
+    <div class="lx-modal lx-preview-modal-content">
+      <div class="lx-preview-modal-header">
+        <span class="cefr-badge cefr-${(lesson.cefrLevel || 'A1').toLowerCase()}">${lesson.cefrLevel || 'A1'}</span>
+        <span class="lesson-duration">⏱ ${lesson.estimatedMinutes} min</span>
+        <button class="lx-modal-close-btn" id="preview-modal-close" aria-label="Close preview">✕</button>
+      </div>
+      <h2 class="lx-preview-title">${esc(lesson.title)}</h2>
+      <p class="lx-preview-objective">🎯 <em>${esc(lesson.objective)}</em></p>
+      ${vocab ? `<div class="lx-preview-section"><div class="lx-preview-section-title">Key Vocabulary</div>${vocab}</div>` : ''}
+      ${sentences ? `<div class="lx-preview-section"><div class="lx-preview-section-title">Core Sentences</div>${sentences}</div>` : ''}
+      <div class="lx-preview-notice">
+        <span class="lx-chip-comingsoon lx-avail-chip" style="font-size:13px">🕐 Full interactive lesson coming soon</span>
+        <p style="font-size:13px;color:var(--grey);margin-top:8px">This lesson content has been prepared. The full interactive engine for A0/A2 lessons will be enabled in the next batch.</p>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+        <button class="btn-start" id="preview-modal-ok">Got it ✓</button>
+      </div>
+    </div>`;
+
+    document.body.appendChild(modal);
+    const close = () => modal.remove();
+    document.getElementById('preview-modal-close').addEventListener('click', close);
+    document.getElementById('preview-modal-ok').addEventListener('click', close);
+    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+
+    // Keyboard trap
+    const focusable = modal.querySelectorAll('button');
+    if (focusable[0]) focusable[0].focus();
+    modal.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') close();
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // ── PLACEMENT TEST VIEW  (#/placement) ──
+  // ══════════════════════════════════════════════════════════════════
+  /*
+   * The placement test has 18 questions covering A0–A2 grammar and vocabulary.
+   * Score mapping:
+   *   0–39%   → recommend A0
+   *   40–69%  → recommend A1
+   *   70–100% → recommend A2
+   */
+  const PLACEMENT_QUESTIONS = [
+    // A0 level — very basic
+    { id: 'p1',  level: 'A0', q: 'What is the correct greeting for the morning?',
+      opts: ['Good morning!', 'Goodbye!', 'Good night!', 'See you!'], correct: 0 },
+    { id: 'p2',  level: 'A0', q: 'Complete: "My name ___ Maria."',
+      opts: ['is', 'am', 'are', 'be'], correct: 0 },
+    { id: 'p3',  level: 'A0', q: 'How do you ask someone\'s name?',
+      opts: ['What is your age?', 'What is your name?', 'Where are you from?', 'How are you?'], correct: 1 },
+    { id: 'p4',  level: 'A0', q: 'Complete: "This ___ a bag."',
+      opts: ['am', 'is', 'are', 'be'], correct: 1 },
+    { id: 'p5',  level: 'A0', q: 'What colour is the sky?',
+      opts: ['red', 'green', 'blue', 'yellow'], correct: 2 },
+    { id: 'p6',  level: 'A0', q: 'Complete: "I ___ 20 years old."',
+      opts: ['have', 'is', 'am', 'are'], correct: 2 },
+    // A1 level — beginner
+    { id: 'p7',  level: 'A1', q: 'Complete: "She ___ from Japan."',
+      opts: ['am', 'is', 'are', 'be'], correct: 1 },
+    { id: 'p8',  level: 'A1', q: 'Which sentence is correct?',
+      opts: ['He are tall.', 'He am tall.', 'He is tall.', 'He be tall.'], correct: 2 },
+    { id: 'p9',  level: 'A1', q: 'Complete: "They ___ students from Spain."',
+      opts: ['am', 'is', 'are', 'be'], correct: 2 },
+    { id: 'p10', level: 'A1', q: 'What does "bag" mean?',
+      opts: ['for writing', 'you carry things in it', 'opens a lock', 'a greeting'], correct: 1 },
+    { id: 'p11', level: 'A1', q: 'How do you ask where someone is from?',
+      opts: ['How old are you?', 'What is your name?', 'Where are you from?', 'What do you do?'], correct: 2 },
+    { id: 'p12', level: 'A1', q: 'Complete: "Is this your phone?" → "Yes, ___ is."',
+      opts: ['he', 'she', 'it', 'they'], correct: 2 },
+    // A2 level — elementary
+    { id: 'p13', level: 'A2', q: 'What is the past form of "work"?',
+      opts: ['works', 'working', 'worked', 'work'], correct: 2 },
+    { id: 'p14', level: 'A2', q: 'Complete: "Yesterday I ___ (go) to the market."',
+      opts: ['go', 'goes', 'going', 'went'], correct: 3 },
+    { id: 'p15', level: 'A2', q: 'How do you form a past simple question?',
+      opts: ['Do you went?', 'Did you go?', 'Are you go?', 'You did go?'], correct: 1 },
+    { id: 'p16', level: 'A2', q: 'Which shows a future plan?',
+      opts: ['I went to the gym.', 'I go to the gym.', 'I\'m going to go to the gym.', 'I am at the gym.'], correct: 2 },
+    { id: 'p17', level: 'A2', q: 'Complete: "I ___ work yesterday." (negative)',
+      opts: ['not', 'didn\'t', 'don\'t', 'wasn\'t'], correct: 1 },
+    { id: 'p18', level: 'A2', q: 'What does "I\'ll help you" express?',
+      opts: ['a past action', 'a future plan', 'a spontaneous offer', 'a habit'], correct: 2 },
+  ];
+
+  function _scorePlacement(answers) {
+    let correct = 0;
+    PLACEMENT_QUESTIONS.forEach(q => {
+      if (answers[q.id] === q.correct) correct++;
+    });
+    return Math.round((correct / PLACEMENT_QUESTIONS.length) * 100);
+  }
+
+  function _recommendLevel(score) {
+    if (score <= 39) return 'A0';
+    if (score <= 69) return 'A1';
+    return 'A2';
+  }
+
+  function renderPlacementTestView() {
+    const div = el('div', 'lx-test-page');
+    const profile = P.getLearnerProfile();
+    const alreadyPlaced = !!profile.currentPath;
+
+    div.innerHTML = `
+    <div class="lx-test-header">
+      <button class="nav-back-btn" id="placement-back-btn">← Dashboard</button>
+      <h1 class="lx-test-title">🎯 Placement Test</h1>
+      <p class="lx-test-subtitle">Answer 18 short questions to find your ideal starting level (A0, A1, or A2).</p>
+      ${alreadyPlaced ? `<div class="lx-test-notice">You are currently on path <span class="cefr-badge cefr-${profile.currentPath.toLowerCase()}">${profile.currentPath}</span>. Retaking this test will update your recommended level.</div>` : ''}
+    </div>
+    <div class="lx-test-progress-bar" id="placement-progress-bar">
+      <div class="lx-test-progress-fill" id="placement-progress-fill" style="width:0%"></div>
+    </div>
+    <form class="lx-test-form" id="placement-form" novalidate>
+      <div class="lx-test-questions" id="placement-questions">
+        ${PLACEMENT_QUESTIONS.map((q, i) => `
+        <div class="lx-test-question" id="q-${q.id}" data-question="${q.id}">
+          <div class="lx-test-q-num">Question ${i + 1} of ${PLACEMENT_QUESTIONS.length}</div>
+          <div class="lx-test-q-text">${esc(q.q)}</div>
+          <div class="lx-test-options" role="radiogroup" aria-label="${esc(q.q)}">
+            ${q.opts.map((opt, oi) => `
+            <label class="lx-test-option">
+              <input type="radio" name="${q.id}" value="${oi}" class="lx-test-radio" />
+              <span class="lx-test-option-text">${esc(opt)}</span>
+            </label>`).join('')}
+          </div>
+        </div>`).join('')}
+      </div>
+      <div class="lx-test-footer">
+        <button type="submit" class="btn-start lx-test-submit-btn" id="placement-submit-btn">
+          Submit Test →
+        </button>
+        <p class="lx-test-footer-note">Answer all questions before submitting. Unanswered questions count as incorrect.</p>
+      </div>
+    </form>
+    <div class="lx-test-result" id="placement-result" style="display:none"></div>`;
+
+    // Track progress
+    setTimeout(() => {
+      const form = document.getElementById('placement-form');
+      if (!form) return;
+      form.addEventListener('change', () => {
+        const answered = PLACEMENT_QUESTIONS.filter(q => form.querySelector(`input[name="${q.id}"]:checked`)).length;
+        const pct = Math.round((answered / PLACEMENT_QUESTIONS.length) * 100);
+        const fill = document.getElementById('placement-progress-fill');
+        if (fill) fill.style.width = pct + '%';
+      });
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const answers = {};
+        PLACEMENT_QUESTIONS.forEach(q => {
+          const checked = form.querySelector(`input[name="${q.id}"]:checked`);
+          answers[q.id] = checked ? parseInt(checked.value) : -1;
+        });
+        const score = _scorePlacement(answers);
+        const recommended = _recommendLevel(score);
+        P.savePlacementResult(score, recommended);
+        st.currentPath = recommended;
+        _showPlacementResult(score, recommended);
+      });
+    }, 0);
+
+    return div;
+  }
+
+  function _showPlacementResult(score, recommended) {
+    const form = document.getElementById('placement-form');
+    if (form) form.style.display = 'none';
+    const progressBar = document.getElementById('placement-progress-bar');
+    if (progressBar) progressBar.style.display = 'none';
+    const resultEl = document.getElementById('placement-result');
+    if (!resultEl) return;
+
+    const levelDesc = {
+      A0: 'You are an absolute beginner. The A0 Foundation Bridge will introduce you to essential English.',
+      A1: 'You have some basic knowledge. The A1 Beginner path will build your core grammar and vocabulary.',
+      A2: 'You have a good foundation. The A2 Elementary path will expand your language into real-world contexts.',
+    }[recommended] || '';
+
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = `
+    <div class="lx-result-card">
+      <div class="lx-result-icon">🎉</div>
+      <h2 class="lx-result-title">Your Result</h2>
+      <div class="lx-result-score-row">
+        <div class="lx-result-score">${score}%</div>
+        <div class="lx-result-score-label">Test score</div>
+      </div>
+      <div class="lx-result-recommendation">
+        <div class="lx-result-rec-label">Recommended path:</div>
+        <span class="cefr-badge cefr-${recommended.toLowerCase()}" style="font-size:20px;padding:8px 20px">${recommended}</span>
+        <div class="lx-result-level-name">${_levelDisplayName(recommended)}</div>
+      </div>
+      <p class="lx-result-desc">${esc(levelDesc)}</p>
+      <div class="lx-result-thresholds">
+        <div class="lx-threshold-row ${score <= 39 ? 'active' : ''}">
+          <span class="cefr-badge cefr-a0">A0</span> 0–39% — Foundation Bridge
+        </div>
+        <div class="lx-threshold-row ${score >= 40 && score <= 69 ? 'active' : ''}">
+          <span class="cefr-badge cefr-a1">A1</span> 40–69% — Beginner
+        </div>
+        <div class="lx-threshold-row ${score >= 70 ? 'active' : ''}">
+          <span class="cefr-badge cefr-a2">A2</span> 70–100% — Elementary
+        </div>
+      </div>
+      <div class="lx-result-actions">
+        <button class="btn-start lx-result-start-btn" id="placement-start-path-btn" data-level="${recommended}">
+          Start ${recommended} Path →
+        </button>
+        <button class="btn-outline lx-result-retake-btn" id="placement-retake-btn">Retake test</button>
+      </div>
+    </div>`;
+
+    document.getElementById('placement-start-path-btn')?.addEventListener('click', () => {
+      navigate('/path/' + recommended);
+    });
+    document.getElementById('placement-retake-btn')?.addEventListener('click', () => {
+      navigate('/placement');
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // ── CHANGE PATH VIEW  (#/change-path) ──
+  // ══════════════════════════════════════════════════════════════════
+  function renderChangePathView() {
+    const div = el('div', 'lx-test-page');
+    const profile = P.getLearnerProfile();
+    const currentPath = profile.currentPath;
+    const LEVEL_ORDER = LX.curriculum.LEVEL_ORDER;
+
+    div.innerHTML = `
+    <div class="lx-test-header">
+      <button class="nav-back-btn" id="change-path-back-btn">← Dashboard</button>
+      <h1 class="lx-test-title">🔄 Change Learning Path</h1>
+      <p class="lx-test-subtitle">Choose a path and take a short gate test to confirm you are ready for that level.</p>
+      ${currentPath
+        ? `<div class="lx-test-notice">Your current path: <span class="cefr-badge cefr-${currentPath.toLowerCase()}">${currentPath}</span> <strong>${_levelDisplayName(currentPath)}</strong></div>`
+        : `<div class="lx-test-notice">You have not taken a placement test yet. <button class="btn-outline-sm lx-inline-btn" id="cp-take-placement-btn">Take placement test</button></div>`
+      }
+    </div>
+    <div class="lx-change-path-grid">
+      ${['A0', 'A1', 'A2'].map(level => {
+        const lvl = LX.curriculum.levels[level];
+        const gateResult = P.getGateTestResult(level);
+        const isCurrent = level === currentPath;
+        const isLower = currentPath && LX.curriculum.levelIndex(level) < LX.curriculum.levelIndex(currentPath);
+        return `
+        <div class="lx-path-option-card${isCurrent ? ' lx-path-option-current' : ''}">
+          <div class="lx-path-option-header">
+            <span class="cefr-badge cefr-${level.toLowerCase()}" style="font-size:16px">${level}</span>
+            <span class="lx-path-option-name">${_levelDisplayName(level)}</span>
+            ${isCurrent ? '<span class="lx-chip-inprogress" style="font-size:11px;margin-left:auto">▶ Current</span>' : ''}
+          </div>
+          <p class="lx-path-option-desc">${esc((lvl && lvl.levelPurpose || '').slice(0, 100))}${(lvl && lvl.levelPurpose && lvl.levelPurpose.length > 100) ? '…' : ''}</p>
+          ${gateResult ? `<div class="lx-gate-result-tag ${gateResult.passed ? 'lx-gate-passed' : 'lx-gate-failed'}">
+            Last test: ${gateResult.score}% — ${gateResult.passed ? '✓ Passed' : '✗ Not passed'}
+          </div>` : ''}
+          <div class="lx-path-option-footer">
+            ${isCurrent
+              ? `<button class="btn-outline lx-path-stay-btn" data-level="${level}" id="stay-on-${level}-btn">Stay on ${level} path</button>`
+              : isLower
+                ? `<button class="btn-outline-sm lx-path-move-down-btn" data-level="${level}" id="move-to-${level}-btn">Move down to ${level}</button>`
+                : `<button class="btn-start lx-gate-test-btn" data-gate-level="${level}" id="gate-${level}-btn">Take ${level} gate test</button>`
+            }
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+
+    return div;
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // ── GATE TEST VIEW  (#/gate-test/:level) ──
+  // ══════════════════════════════════════════════════════════════════
+  /*
+   * Gate test thresholds:
+   *   A0 gate: 0%  (always pass — for moving down)
+   *   A1 gate: 40% (need ≥ 40% to enter A1 from A0)
+   *   A2 gate: 70% (need ≥ 70% to enter A2 from A1)
+   */
+  const GATE_THRESHOLDS = { A0: 0, A1: 40, A2: 70 };
+
+  // Gate tests use same questions as placement, filtered by level group
+  function _getGateQuestions(targetLevel) {
+    const levelGroup = { A0: ['A0'], A1: ['A0', 'A1'], A2: ['A1', 'A2'] }[targetLevel] || ['A0'];
+    return PLACEMENT_QUESTIONS.filter(q => levelGroup.includes(q.level));
+  }
+
+  function renderGateTestView(targetLevel) {
+    const level = (targetLevel || 'A1').toUpperCase();
+    const profile = P.getLearnerProfile();
+    const currentPath = profile.currentPath;
+    const questions = _getGateQuestions(level);
+    const threshold = GATE_THRESHOLDS[level] !== undefined ? GATE_THRESHOLDS[level] : 40;
+    const div = el('div', 'lx-test-page');
+
+    div.innerHTML = `
+    <div class="lx-test-header">
+      <button class="nav-back-btn" id="gate-test-back-btn">← Change path</button>
+      <h1 class="lx-test-title">🔑 ${level} Gate Test</h1>
+      <p class="lx-test-subtitle">
+        Answer ${questions.length} questions to show you are ready for the ${level} (${_levelDisplayName(level)}) path.
+        You need <strong>${threshold}%</strong> or above to unlock this path.
+      </p>
+      ${currentPath ? `<div class="lx-test-notice">Your current path: <span class="cefr-badge cefr-${currentPath.toLowerCase()}">${currentPath}</span></div>` : ''}
+    </div>
+    <div class="lx-test-progress-bar">
+      <div class="lx-test-progress-fill" id="gate-progress-fill" style="width:0%"></div>
+    </div>
+    <form class="lx-test-form" id="gate-form" novalidate>
+      <div class="lx-test-questions">
+        ${questions.map((q, i) => `
+        <div class="lx-test-question" data-question="${q.id}">
+          <div class="lx-test-q-num">Question ${i + 1} of ${questions.length}</div>
+          <div class="lx-test-q-text">${esc(q.q)}</div>
+          <div class="lx-test-options" role="radiogroup" aria-label="${esc(q.q)}">
+            ${q.opts.map((opt, oi) => `
+            <label class="lx-test-option">
+              <input type="radio" name="${q.id}" value="${oi}" class="lx-test-radio" />
+              <span class="lx-test-option-text">${esc(opt)}</span>
+            </label>`).join('')}
+          </div>
+        </div>`).join('')}
+      </div>
+      <div class="lx-test-footer">
+        <button type="submit" class="btn-start lx-test-submit-btn" id="gate-submit-btn">Submit Gate Test →</button>
+        <p class="lx-test-footer-note">Need ${threshold}% to unlock ${level}. Unanswered = incorrect.</p>
+      </div>
+    </form>
+    <div class="lx-test-result" id="gate-result" style="display:none"></div>`;
+
+    setTimeout(() => {
+      const form = document.getElementById('gate-form');
+      if (!form) return;
+      form.addEventListener('change', () => {
+        const answered = questions.filter(q => form.querySelector(`input[name="${q.id}"]:checked`)).length;
+        const pct = Math.round((answered / questions.length) * 100);
+        const fill = document.getElementById('gate-progress-fill');
+        if (fill) fill.style.width = pct + '%';
+      });
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const answers = {};
+        questions.forEach(q => {
+          const checked = form.querySelector(`input[name="${q.id}"]:checked`);
+          answers[q.id] = checked ? parseInt(checked.value) : -1;
+        });
+        const correct = questions.filter(q => answers[q.id] === q.correct).length;
+        const score = Math.round((correct / questions.length) * 100);
+        const passed = score >= threshold;
+        P.saveGateTestResult(level, score, passed);
+        if (passed) st.currentPath = level;
+        _showGateResult(level, score, passed, threshold, currentPath);
+      });
+    }, 0);
+
+    return div;
+  }
+
+  function _showGateResult(level, score, passed, threshold, previousPath) {
+    const form = document.getElementById('gate-form');
+    if (form) form.style.display = 'none';
+    const progressBar = document.querySelector('.lx-test-progress-bar');
+    if (progressBar) progressBar.style.display = 'none';
+    const resultEl = document.getElementById('gate-result');
+    if (!resultEl) return;
+
+    const lowerLevel = { A0: null, A1: 'A0', A2: 'A1' }[level];
+    const prevPath = previousPath || 'A1';
+
+    if (passed) {
+      resultEl.style.display = 'block';
+      resultEl.innerHTML = `
+      <div class="lx-result-card lx-result-success">
+        <div class="lx-result-icon">🎉</div>
+        <h2 class="lx-result-title">You passed!</h2>
+        <div class="lx-result-score-row">
+          <div class="lx-result-score" style="color:var(--green)">${score}%</div>
+          <div class="lx-result-score-label">Score (needed ${threshold}%)</div>
+        </div>
+        <p style="font-size:15px;color:var(--navy);margin:12px 0">
+          Congratulations! You are now assigned to the
+          <span class="cefr-badge cefr-${level.toLowerCase()}">${level}</span>
+          <strong>${_levelDisplayName(level)}</strong> path.
+        </p>
+        <div class="lx-result-actions">
+          <button class="btn-start" id="gate-go-path-btn" data-level="${level}">
+            Start ${level} Path →
+          </button>
+        </div>
+      </div>`;
+      document.getElementById('gate-go-path-btn')?.addEventListener('click', () => {
+        navigate('/path/' + level);
+      });
+    } else {
+      resultEl.style.display = 'block';
+      resultEl.innerHTML = `
+      <div class="lx-result-card lx-result-encouragement">
+        <div class="lx-result-icon">💪</div>
+        <h2 class="lx-result-title">Good effort!</h2>
+        <div class="lx-result-score-row">
+          <div class="lx-result-score" style="color:var(--amber)">${score}%</div>
+          <div class="lx-result-score-label">Score (needed ${threshold}%)</div>
+        </div>
+        <p style="font-size:15px;color:var(--navy);margin:12px 0;line-height:1.6">
+          You scored <strong>${score}%</strong>, just below the ${threshold}% needed for ${level}.
+          You are close! Based on this test, you will get the most out of the
+          <span class="cefr-badge cefr-${prevPath.toLowerCase()}">${prevPath}</span>
+          <strong>${_levelDisplayName(prevPath)}</strong> path right now.
+        </p>
+        <p style="font-size:14px;color:var(--grey);line-height:1.6">
+          Complete more of your current path to build confidence, then try the gate test again.
+        </p>
+        <div class="lx-result-actions" style="flex-wrap:wrap">
+          <button class="btn-start" id="gate-stay-btn">Stay on ${prevPath} path</button>
+          ${lowerLevel ? `<button class="btn-outline" id="gate-try-lower-btn" data-level="${lowerLevel}">Try ${lowerLevel} path instead</button>` : ''}
+          <button class="btn-outline-sm" id="gate-retake-btn" data-level="${level}">Retake test later</button>
+        </div>
+      </div>`;
+
+      document.getElementById('gate-stay-btn')?.addEventListener('click', () => {
+        navigate('/path/' + prevPath);
+      });
+      document.getElementById('gate-try-lower-btn')?.addEventListener('click', () => {
+        if (lowerLevel) {
+          P.saveGateTestResult(lowerLevel, 100, true);
+          st.currentPath = lowerLevel;
+          navigate('/path/' + lowerLevel);
+        }
+      });
+      document.getElementById('gate-retake-btn')?.addEventListener('click', () => {
+        navigate('/change-path');
+      });
+    }
+  }
+
   // ── INIT ──
   function init() {
+    // Load learner profile (currentPath) from localStorage
+    const profile = P.getLearnerProfile();
+    st.currentPath = profile.currentPath || null;
+
     // Hydrate routing state from current hash before first render
     const initHash = location.hash.replace('#', '') || '';
     st.currentView = getRoute();
@@ -4660,6 +5258,8 @@
       st.pathLevel = initHash.replace('/path/', '');
     } else if (initHash.startsWith('/scenario/')) {
       st.scenarioFamily = initHash.replace('/scenario/', '');
+    } else if (initHash.startsWith('/gate-test/')) {
+      st.gateTestTarget = initHash.replace('/gate-test/', '').toUpperCase();
     }
     // Wire _renderLesson so state.js._navigateToStage can trigger a re-render
     LX._renderLesson = function() {

@@ -898,6 +898,101 @@
     }[band] || '#475569';
   }
 
+  // ══════════════════════════════════════════════════════════════
+  // ── LEARNER PROFILE — currentPath, placement, gate tests ──
+  // ══════════════════════════════════════════════════════════════
+  const PROFILE_KEY = 'lx_learner_profile_v1';
+
+  /**
+   * Load learner profile from localStorage.
+   * Profile shape:
+   * {
+   *   currentPath: 'A0' | 'A1' | 'A2' | null,
+   *   placementTestResult: { score, recommendedLevel, takenAt } | null,
+   *   gateTestResults: { [targetLevel]: { score, passed, takenAt } },
+   * }
+   */
+  function getLearnerProfile() {
+    try {
+      const raw = localStorage.getItem(PROFILE_KEY);
+      if (!raw) return _defaultProfile();
+      const parsed = JSON.parse(raw);
+      return Object.assign(_defaultProfile(), parsed);
+    } catch (e) {
+      console.warn('[LX persist] getLearnerProfile error:', e);
+      return _defaultProfile();
+    }
+  }
+
+  function _defaultProfile() {
+    return {
+      currentPath: null,         // null = not placed yet
+      placementTestResult: null,
+      gateTestResults: {},
+    };
+  }
+
+  function setLearnerProfile(profile) {
+    try {
+      const current = getLearnerProfile();
+      const merged = Object.assign({}, current, profile);
+      localStorage.setItem(PROFILE_KEY, JSON.stringify(merged));
+      return merged;
+    } catch (e) {
+      console.warn('[LX persist] setLearnerProfile error:', e);
+    }
+  }
+
+  /** Set the learner's current learning path. */
+  function setCurrentPath(level) {
+    return setLearnerProfile({ currentPath: level });
+  }
+
+  /** Get the learner's current learning path (or null if not placed). */
+  function getCurrentPath() {
+    return getLearnerProfile().currentPath;
+  }
+
+  /** Save placement test result and set currentPath. */
+  function savePlacementResult(score, recommendedLevel) {
+    const result = {
+      score: score,
+      recommendedLevel: recommendedLevel,
+      takenAt: new Date().toISOString(),
+    };
+    setLearnerProfile({
+      placementTestResult: result,
+      currentPath: recommendedLevel,
+    });
+    return result;
+  }
+
+  /** Save gate test result for a given target level. */
+  function saveGateTestResult(targetLevel, score, passed) {
+    const profile = getLearnerProfile();
+    const gateResults = Object.assign({}, profile.gateTestResults || {});
+    gateResults[targetLevel] = {
+      score: score,
+      passed: passed,
+      takenAt: new Date().toISOString(),
+    };
+    const updates = { gateTestResults: gateResults };
+    if (passed) updates.currentPath = targetLevel;
+    setLearnerProfile(updates);
+    return gateResults[targetLevel];
+  }
+
+  /** Get gate test result for a target level. */
+  function getGateTestResult(targetLevel) {
+    const profile = getLearnerProfile();
+    return (profile.gateTestResults || {})[targetLevel] || null;
+  }
+
+  /** Clear placement (reset — useful for testing). */
+  function clearPlacement() {
+    localStorage.removeItem(PROFILE_KEY);
+  }
+
   // ── PUBLIC API ──
   window.LX = window.LX || {};
   window.LX.persist = {
@@ -931,6 +1026,15 @@
     formatDate,
     getResultBandLabel,
     getResultBandColor,
+    // Learner profile / placement / gate
+    getLearnerProfile,
+    setLearnerProfile,
+    setCurrentPath,
+    getCurrentPath,
+    savePlacementResult,
+    saveGateTestResult,
+    getGateTestResult,
+    clearPlacement,
     // Constants
     STAGE_STATUS,
     INSTRUCTIONAL_STAGE_KEYS,
