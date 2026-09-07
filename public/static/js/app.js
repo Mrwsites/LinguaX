@@ -555,7 +555,7 @@
       const bandLabel = P.getResultBandLabel(band);
       const duration = P.formatDuration(latestCompleted.active_duration_seconds || latestCompleted.duration_seconds);
       const rubricScores = latestCompleted.attempt_summary_json?.rubricScores || {};
-      const dims = LX.lesson_A1_001.rubric.dimensions;
+      const dims = (LX._activeLesson || LX.lesson_A1_001).rubric.dimensions;
 
       const summaryEl = el('div', 'lx-review-summary');
       summaryEl.innerHTML = `
@@ -1174,7 +1174,7 @@
   }
 
   function renderLessonSidebar() {
-    const lesson = LX.lesson_A1_001;
+    const lesson = LX._activeLesson || LX.lesson_A1_001;
     const prog = LX.getInstructionalProgress();
     const ev = LX.getEvidenceProgress();
     const sidebar = el('div', 'lesson-sidebar');
@@ -1203,7 +1203,7 @@
   }
 
   function renderLessonHeader() {
-    const lesson = LX.lesson_A1_001;
+    const lesson = LX._activeLesson || LX.lesson_A1_001;
     const card = el('div', 'lesson-header-card');
     card.innerHTML = `
     <div class="lesson-header-meta">
@@ -1270,7 +1270,7 @@
 
   // ── STAGE 0: OVERVIEW ──
   function renderOverviewStage() {
-    const lesson = LX.lesson_A1_001;
+    const lesson = LX._activeLesson || LX.lesson_A1_001;
     // Mark as viewed when opened
     if (!st.isReadOnly) LX.markStageViewed('overview');
 
@@ -1322,7 +1322,7 @@
 
   // ── STAGE 1: VISUAL TIME ──
   function renderVisualStage() {
-    const vt = LX.lesson_A1_001.visualTime;
+    const vt = (LX._activeLesson || LX.lesson_A1_001).visualTime;
     const cs = st.stageCheckState.visual;
     const readOnly = st.isReadOnly;
 
@@ -1394,7 +1394,7 @@
 
   // ── STAGE 2: GRAMMAR FOCUS ──
   function renderGrammarStage() {
-    const gf = LX.lesson_A1_001.grammarFocus;
+    const gf = (LX._activeLesson || LX.lesson_A1_001).grammarFocus;
     const cs = st.stageCheckState.grammar;
     const readOnly = st.isReadOnly;
 
@@ -1483,7 +1483,7 @@
 
   // ── STAGE 3: CORE SENTENCES ──
   function renderCoreSentenceStage() {
-    const cs = LX.lesson_A1_001.coreSentences;
+    const cs = (LX._activeLesson || LX.lesson_A1_001).coreSentences;
     const sentencesHtml = cs.sentences.map(s => {
       const partsHtml = s.breakdown.map(p => `
         <div class="sentence-part part-${p.type}">
@@ -1579,7 +1579,7 @@
 
   // ── STAGE 4: VOCABULARY ──
   function renderVocabStage() {
-    const vocab = LX.lesson_A1_001.vocabulary;
+    const vocab = (LX._activeLesson || LX.lesson_A1_001).vocabulary;
     const groupsHtml = Object.entries(vocab.groups).map(([key, group]) => {
       const rows = group.items.map(item => {
         const exWithHighlight = item.example.replace(`{${item.word}}`, `<strong style="color:var(--amber)">${item.word}</strong>`);
@@ -1654,7 +1654,7 @@
 
   // ── STAGE 4b: USEFUL PHRASES ──
   function renderPhrasesStage() {
-    const phrases = LX.lesson_A1_001.usefulSentences;
+    const phrases = (LX._activeLesson || LX.lesson_A1_001).usefulSentences;
     const colorMap = {
       statements: 'var(--green)', questions: 'var(--accent)',
       negative: 'var(--red)', polite: 'var(--purple)', expansion: 'var(--teal)',
@@ -1729,7 +1729,7 @@
 
   // ── STAGE 5: PRACTICE ──
   function renderPracticeStage() {
-    const ex = LX.lesson_A1_001.exercises;
+    const ex = (LX._activeLesson || LX.lesson_A1_001).exercises;
     const allStagesHtml = ex.stages.map((stage, si) => renderExerciseStage(stage, si)).join('');
     const bodyHTML = `<div class="exercise-body"><div style="font-size:13px;color:var(--grey);margin-bottom:20px;font-style:italic">${ex.tagline}</div>${allStagesHtml}</div>`;
     return sectionCard('#DC2626', ex.stage, `${ex.label}: ${ex.tagline}`, bodyHTML, navButtons(6));
@@ -1876,7 +1876,7 @@
 
   // ── STAGE 5b: GUIDED DIALOGUE ──
   function renderDialogueStage() {
-    const gd = LX.lesson_A1_001.guidedDialogue;
+    const gd = (LX._activeLesson || LX.lesson_A1_001).guidedDialogue;
     const ds = st.dialogueState;
     const readOnly = st.isReadOnly;
 
@@ -2041,7 +2041,7 @@
 
   // ── STAGE 5c: INFORMATION GAP ──
   function renderInfoGapStage() {
-    const ig = LX.lesson_A1_001.informationGap;
+    const ig = (LX._activeLesson || LX.lesson_A1_001).informationGap;
     const igs = st.infoGapState;
     const readOnly = st.isReadOnly;
 
@@ -2093,7 +2093,7 @@
 
   // ── STAGE 6: TRANSFER ──
   function renderTransferStage() {
-    const tc = LX.lesson_A1_001.transferChallenge;
+    const tc = (LX._activeLesson || LX.lesson_A1_001).transferChallenge;
     const ts = st.transferState;
     const scenario = tc.scenarios[ts.selectedScenario];
     const readOnly = st.isReadOnly;
@@ -2178,7 +2178,7 @@
     if (!st.isReadOnly) LX.markStageViewed('feedback');
     const score = LX.autoScoreRubric();
     const band = LX.getScoreBand(score);
-    const dims = LX.lesson_A1_001.rubric.dimensions;
+    const dims = (LX._activeLesson || LX.lesson_A1_001).rubric.dimensions;
     const ev = LX.getEvidenceProgress();
 
     const dimsHtml = dims.map(dim => {
@@ -2207,7 +2207,7 @@
 
     // Attempt saved panel
     const attempt = st.currentAttemptId ? P.getAttempt(st.currentAttemptId) : null;
-    const tc = LX.lesson_A1_001.transferChallenge;
+    const tc = (LX._activeLesson || LX.lesson_A1_001).transferChallenge;
     const scenarioTitle = tc.scenarios[st.transferState.selectedScenario]?.title || '—';
     const attemptSavedPanel = !st.isReadOnly && attempt ? `
     <div style="margin-bottom:20px;padding:16px;background:var(--navy);border-radius:var(--radius-md);color:white">
@@ -2273,7 +2273,7 @@
       </div>
       <div style="margin-top:20px;padding:14px 16px;background:var(--navy);border-radius:var(--radius-md);color:white">
         <div style="font-size:13px;font-weight:700;margin-bottom:8px">📋 What to remember:</div>
-        ${LX.lesson_A1_001.whatToRemember.map(r =>
+        ${(LX._activeLesson || LX.lesson_A1_001).whatToRemember.map(r =>
           `<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;font-size:13px">
             <span>${r.emoji}</span><span>${r.rule}</span>
           </div>`).join('')}
@@ -2284,7 +2284,7 @@
 
   // ── STAGE: REVIEW PLAN ──
   function renderReviewStage() {
-    const rp = LX.lesson_A1_001.reviewPlan;
+    const rp = (LX._activeLesson || LX.lesson_A1_001).reviewPlan;
     if (!st.reviewSchedule && !st.isReadOnly) {
       LX.markStageComplete('review');
     }
@@ -2350,7 +2350,7 @@
       <div class="review-timeline">${eventsHtml}</div>
       <div style="margin-top:24px;padding:16px;background:var(--navy);border-radius:var(--radius-md);color:white">
         <div style="font-size:14px;font-weight:700;margin-bottom:12px">⭐ Final "What to remember"</div>
-        ${LX.lesson_A1_001.whatToRemember.map(r =>
+        ${(LX._activeLesson || LX.lesson_A1_001).whatToRemember.map(r =>
           `<div style="display:flex;gap:8px;margin-bottom:8px;font-size:13px"><span>${r.emoji}</span><span>${r.rule}</span></div>`
         ).join('')}
       </div>
@@ -2596,7 +2596,7 @@
     const stageAttempts = P.getStageAttempts(attemptId);
     const reviewEvents = P.getReviewEvents(attemptId);
     const rubricScores = attempt.attempt_summary_json?.rubricScores || {};
-    const dims = LX.lesson_A1_001.rubric.dimensions;
+    const dims = (LX._activeLesson || LX.lesson_A1_001).rubric.dimensions;
 
     // ── Header ──
     const header = el('div', 'lx-ah-header');
@@ -2760,7 +2760,7 @@
     const bandColor = P.getResultBandColor(attempt.result_band);
     const bandLabel = P.getResultBandLabel(attempt.result_band);
 
-    const tc = LX.lesson_A1_001.transferChallenge;
+    const tc = (LX._activeLesson || LX.lesson_A1_001).transferChallenge;
     const transferSA = scenarioAttempts.find(sa => {
       const inst = scenarioInstances.find(si => si.id === sa.scenario_instance_id);
       return inst?.scenario_stage === 'TRANSFER';
@@ -2815,7 +2815,7 @@
       <div style="padding:16px">
         <div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:14px">📊 Rubric Breakdown</div>
         <div class="rubric-dimensions">
-          ${LX.lesson_A1_001.rubric.dimensions.map(dim => {
+          ${(LX._activeLesson || LX.lesson_A1_001).rubric.dimensions.map(dim => {
             const score = attempt.attempt_summary_json.rubricScores[dim.id] || 0;
             const dots = [0,1,2].map(d => `<div class="rubric-dot${d < score ? ' filled' : ''}"></div>`).join('');
             return `<div class="rubric-dim">
@@ -2868,7 +2868,7 @@
     // Info gap evidence
     if (infoGapStage?.answers && Object.keys(infoGapStage.answers).length > 0) {
       const igCard = el('div', 'section-card');
-      const ig = LX.lesson_A1_001.informationGap;
+      const ig = (LX._activeLesson || LX.lesson_A1_001).informationGap;
       igCard.innerHTML = `
       <div style="padding:16px">
         <div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:14px">🔍 Information Gap Evidence</div>
@@ -3405,8 +3405,9 @@
         const lid = btn.dataset.navLesson;
         if (lid === 'A1-BE-LOST-PROPERTY-001') {
           _startOrResumeLesson(false);
+        } else if (window.LX.lessonBodies && window.LX.lessonBodies[lid]) {
+          renderGenericLessonView(lid);
         } else {
-          // Future: navigate to that lesson. For now show it's coming.
           _showComingSoonModal('This lesson content is being prepared.');
         }
       });
@@ -3643,8 +3644,11 @@
           } else {
             _startOrResumeLesson(false);
           }
+        } else if (window.LX.lessonBodies && window.LX.lessonBodies[lid]) {
+          // Published lesson with a body — run through the generic engine
+          renderGenericLessonView(lid);
         } else {
-          // New lessons: show lesson overview modal
+          // No body available yet — show preview modal
           _showLessonPreviewModal(lid);
         }
       };
@@ -4020,7 +4024,7 @@
         if (st.isReadOnly) return;
         const idx = parseInt(btn.dataset.scenario);
         st.transferState.selectedScenario = idx;
-        if (st.currentAttemptId) P.logScenarioSelected(st.currentAttemptId, LX.lesson_A1_001.transferChallenge.scenarios[idx]?.id);
+        if (st.currentAttemptId) P.logScenarioSelected(st.currentAttemptId, (LX._activeLesson || LX.lesson_A1_001).transferChallenge.scenarios[idx]?.id);
         render();
       });
     });
@@ -4055,7 +4059,7 @@
     if (submitTransfer) {
       submitTransfer.addEventListener('click', () => {
         if (st.isReadOnly) return;
-        const scenario = LX.lesson_A1_001.transferChallenge.scenarios[st.transferState.selectedScenario];
+        const scenario = (LX._activeLesson || LX.lesson_A1_001).transferChallenge.scenarios[st.transferState.selectedScenario];
         const score = LX.autoScoreRubric();
         const band = LX.getScoreBand(score);
         st.transferState.submitted = true;
@@ -4621,7 +4625,7 @@
   }
 
   function checkExercise(stageId) {
-    const es = LX.lesson_A1_001.exercises.stages.find(s => s.id === stageId);
+    const es = (LX._activeLesson || LX.lesson_A1_001).exercises.stages.find(s => s.id === stageId);
     if (!es) return;
     const stateKey = toCamel(stageId);
     let correct = 0;
@@ -4752,7 +4756,7 @@
 
   function checkInfoGap() {
     if (st.isReadOnly) return;
-    const ig = LX.lesson_A1_001.informationGap;
+    const ig = (LX._activeLesson || LX.lesson_A1_001).informationGap;
     const answers = {};
     $$('[id^="ig-"]').forEach(input => {
       const i = parseInt(input.dataset.item);
@@ -4836,6 +4840,400 @@
     modal.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') close();
     });
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // ── GENERIC LESSON RENDERER (Phase 3 Module 1) ──
+  // Makes every PUBLISHED lesson in A0–A2 that has a body in
+  // window.LX.lessonBodies fully playable through the existing
+  // 12-stage engine, without changing data.js, persist.js, or state.js.
+  // ══════════════════════════════════════════════════════════════════
+
+  /*
+   * _buildNormalizedLesson(lessonId, body)
+   * Maps the generic _mkBody format (from curriculum_data.js) to the
+   * shape that the 12-stage engine expects (same shape as LX.lesson_A1_001).
+   * The fallback (LX.lesson_A1_001) is used for any field not provided.
+   */
+  function _buildNormalizedLesson(lessonId, body) {
+    const stub = LX.curriculum.getLessonById(lessonId) || {};
+    const base = LX.lesson_A1_001; // fallback reference
+
+    /* ── Vocabulary: generic body has a flat array; engine needs .groups{} ── */
+    const vocabGroups = {};
+    if (body.vocabulary && body.vocabulary.length) {
+      vocabGroups['words'] = {
+        title: 'Key Words',
+        emoji: '📖',
+        items: body.vocabulary.map(function(v) {
+          return {
+            word: v.word,
+            pos: v.pos || 'word',
+            def: v.definition,
+            example: v.example || (v.word + ' is important.'),
+            emoji: v.emoji || '📝',
+          };
+        }),
+      };
+    }
+
+    /* ── Useful Phrases: generic body has a flat array; engine needs .groups{} ── */
+    const phraseGroups = {};
+    if (body.usefulPhrases && body.usefulPhrases.length) {
+      phraseGroups['phrases'] = {
+        title: 'Useful Phrases',
+        colorClass: 'phrases-green',
+        function: 'Key expressions for this lesson',
+        items: body.usefulPhrases.map(function(p) {
+          return {
+            phrase: p.phrase,
+            function: p.context || '',
+          };
+        }),
+      };
+    }
+
+    /* ── Exercises: generic body has .recognition[], .matching[], .controlled[], .transform[] ──
+       engine expects .stages[] where each stage has .id, .num, .type, .title, .prompt, .items[] ── */
+    const exerciseStages = [];
+    var pr = body.practice || {};
+
+    if (pr.recognition && pr.recognition.length) {
+      exerciseStages.push({
+        id: 'recognition',
+        num: 1,
+        type: 'Recognition',
+        title: 'Choose the correct answer',
+        prompt: 'Read each question. Choose the best answer.',
+        contentType: 'CURATED_CORE',
+        items: pr.recognition.map(function(r) {
+          return {
+            sentence: r.prompt,
+            blank: 0,
+            options: r.options,
+            answer: r.options[r.correct],
+            explanation: 'Select the correct option.',
+          };
+        }),
+      });
+    }
+
+    if (pr.matching && pr.matching.length) {
+      exerciseStages.push({
+        id: 'matching',
+        num: 2,
+        type: 'Recognition',
+        title: 'Match the pairs',
+        prompt: 'Match each item on the left with the correct item on the right.',
+        contentType: 'CURATED_CORE',
+        items: pr.matching.map(function(m) {
+          return {
+            sentence: m.left + ' → ?',
+            question: 'What does "' + m.left + '" match with?',
+            options: [m.correctRight, m.right !== m.correctRight ? m.right : '(other option)', 'something else', 'none of these'].filter(function(o, i, a) { return a.indexOf(o) === i; }).slice(0, 4),
+            answer: m.correctRight,
+            explanation: '"' + m.left + '" matches with "' + m.correctRight + '".',
+          };
+        }),
+      });
+    }
+
+    if (pr.controlled && pr.controlled.length) {
+      exerciseStages.push({
+        id: 'controlled_production',
+        num: exerciseStages.length + 1,
+        type: 'Controlled Production',
+        title: 'Complete the sentences',
+        prompt: 'Write the correct word or phrase.',
+        contentType: 'CURATED_CORE',
+        items: pr.controlled.map(function(c) {
+          return {
+            template: c.prompt,
+            answer: c.answer,
+            hint: 'Look at the examples in this lesson.',
+          };
+        }),
+      });
+    }
+
+    if (pr.transform && pr.transform.length) {
+      exerciseStages.push({
+        id: 'question_transform',
+        num: exerciseStages.length + 1,
+        type: 'Controlled Production',
+        title: 'Transform the sentences',
+        prompt: 'Change each sentence as instructed.',
+        contentType: 'CURATED_CORE',
+        items: pr.transform.map(function(t) {
+          return {
+            statement: t.statement || t.prompt,
+            answer: t.answer,
+            hint: t.hint || 'Follow the pattern.',
+          };
+        }),
+      });
+    }
+
+    // Ensure at least one exercise stage so the engine doesn't break
+    if (!exerciseStages.length) {
+      exerciseStages.push(base.exercises.stages[0]);
+    }
+
+    /* ── Guided Dialogue ── */
+    var gd = body.guidedDialogue || {};
+    var successChecklist = [];
+    if (gd.turns && gd.turns.length) {
+      // Build checklist from turns
+      successChecklist = [
+        'You used the key phrases from this lesson',
+        'You responded appropriately to your partner',
+        'You completed the conversation task',
+      ];
+    } else {
+      successChecklist = base.guidedDialogue.successChecklist;
+    }
+
+    /* ── Information Gap ── */
+    var ig = body.informationGap || {};
+    var igStudentHas = [];
+    var igPartnerHas = [];
+    var igAnswerKey = [];
+
+    if (ig.studentHas && ig.studentHas.length) {
+      igStudentHas = ig.studentHas.map(function(s, i) {
+        return typeof s === 'string'
+          ? { emoji: ['📝','🔑','📱','🎫'][i % 4], object: s, description: 'for this lesson' }
+          : s;
+      });
+      igPartnerHas = ig.partnerHas && ig.partnerHas.length
+        ? ig.partnerHas.map(function(p, i) {
+            return typeof p === 'string'
+              ? { object: igStudentHas[i] ? igStudentHas[i].object : ('item ' + i), owner: p }
+              : p;
+          })
+        : igStudentHas.map(function(s, i) { return { object: s.object, owner: 'Partner ' + (i + 1) }; });
+      igAnswerKey = igStudentHas.map(function(s, i) {
+        var owner = igPartnerHas[i] ? igPartnerHas[i].owner : 'someone';
+        return { object: s.object, owner: owner, sentence: 'The ' + s.object + ' belongs to ' + owner + '.' };
+      });
+    } else {
+      igStudentHas = base.informationGap.studentHas;
+      igPartnerHas = base.informationGap.partnerHas;
+      igAnswerKey  = base.informationGap.answerKey;
+    }
+
+    /* ── Transfer Challenge ── */
+    var tc = body.transferChallenge || {};
+    var tcScenarios = [];
+    if (tc.scenarios && tc.scenarios.length) {
+      tcScenarios = tc.scenarios.map(function(s) {
+        return {
+          id: s.id || 'sc1',
+          title: s.title || 'New Situation',
+          setting: s.setting || 'A real-world context',
+          studentRole: s.studentRole || 'Yourself',
+          partnerRole: s.partnerRole || 'A person',
+          newGap: s.newGap || 'Use what you learned today in this new situation.',
+          lostItems: s.lostItems || [],
+          targetLanguage: s.targetLanguage || [],
+          successCriteria: Array.isArray(s.successCriteria)
+            ? s.successCriteria
+            : [s.successCriteria || 'Complete the task using today\'s language.'],
+        };
+      });
+    } else {
+      tcScenarios = base.transferChallenge.scenarios;
+    }
+
+    /* ── Rubric ── */
+    var rubric = body.rubric || {};
+    var rubricDims = rubric.dimensions && rubric.dimensions.length
+      ? rubric.dimensions
+      : base.rubric.dimensions;
+    var rubricBands = rubric.scoreBands && rubric.scoreBands.length
+      ? rubric.scoreBands
+      : base.rubric.scoreBands;
+
+    /* ── Core Sentences: normalize to engine shape ── */
+    var csSentences = [];
+    if (body.coreSentences && body.coreSentences.length) {
+      csSentences = body.coreSentences.map(function(s, i) {
+        if (s.breakdown) return s; // already full shape
+        return {
+          id: s.id || 'cs-' + i,
+          model: s.sentence || s.model || '',
+          coreSentenceNum: i + 1,
+          breakdown: [],
+          wordTable: [],
+          tenseLink: null,
+        };
+      });
+    } else {
+      csSentences = base.coreSentences.sentences;
+    }
+
+    /* ── Visual Time: synthesize from body.visual ── */
+    var visual = body.visual || {};
+    var vtVisuals = [];
+    var vtMindMapItems = [];
+    var vtTagline = visual.caption || stub.objective || base.visualTime.tagline;
+
+    if (body.vocabulary && body.vocabulary.length) {
+      vtVisuals = body.vocabulary.slice(0, 4).map(function(v) {
+        return {
+          emoji: v.emoji || '📝',
+          word: v.word,
+          sentence: v.example || ('The ' + v.word + ' is important.'),
+          highlight: v.word,
+        };
+      });
+      vtMindMapItems = body.vocabulary.slice(0, 6).map(function(v, i) {
+        return { text: v.word, highlight: i < 2 };
+      });
+    } else {
+      vtVisuals = base.visualTime.visuals;
+      vtMindMapItems = base.visualTime.mindMapItems;
+    }
+
+    /* ── Grammar Focus: build from body.grammar ── */
+    var gfGrammar = body.grammar || {};
+    var gfSections = [];
+    if (gfGrammar.explanation) {
+      gfSections = [
+        { type: 'what', title: 'What is it?',      content: gfGrammar.explanation },
+        { type: 'how',  title: 'How does it work?', content: (gfGrammar.examples || []).slice(0, 3).join('<br>') || 'See the examples above.' },
+        { type: 'when', title: 'When do I use it?', content: 'Use this language in the situations shown in this lesson.' },
+        { type: 'why',  title: 'Why is it important?', content: 'This grammar helps you communicate clearly in everyday English.' },
+        { type: 'errors', title: 'Common mistakes', content: null, errors: [] },
+      ];
+    } else {
+      gfSections = base.grammarFocus.sections;
+    }
+
+    /* ── Assemble the normalized lesson object ── */
+    return {
+      id:                lessonId,
+      version:           body.version || '1.0.0',
+      contentType:       'CURATED_CORE',
+      cefrLevel:         body.cefrLevel || stub.cefrLevel || 'A1',
+      grammarPointIds:   body.grammarPointIds || stub.grammarFocus || [],
+      title:             body.title || stub.title || lessonId,
+      objective:         body.objective || stub.objective || '',
+      estimatedMinutes:  stub.estimatedMinutes || 20,
+      scenarioFamilyName: (LX.scenarioFamilies && LX.scenarioFamilies.find(function(f) { return f.id === (stub.scenarioFamily || 'personal_life'); }) || {}).name || 'English',
+      whatToRemember:    base.whatToRemember,
+
+      visualTime: {
+        stage:         'Stage 01',
+        label:         'Visual Time',
+        tagline:       vtTagline,
+        visuals:       vtVisuals,
+        mindMapTitle:  'Key Language',
+        mindMapItems:  vtMindMapItems,
+      },
+
+      grammarFocus: {
+        stage:          'Stage 02',
+        label:          'Grammar Focus',
+        tagline:        'Understand the rule. See the pattern.',
+        grammarName:    gfGrammar.title || ('Grammar: ' + (body.grammarPointIds || []).join(', ')),
+        sections:       gfSections,
+        verbToBeTable:  base.grammarFocus.verbToBeTable,
+      },
+
+      coreSentences: {
+        stage:    'Stage 03',
+        label:    'Core Sentences',
+        tagline:  'Study the models. Understand every word.',
+        sentences: csSentences,
+      },
+
+      vocabulary: {
+        stage:   'Stage 04',
+        label:   'Vocabulary',
+        tagline: 'Learn the words. Build your toolkit.',
+        groups:  Object.keys(vocabGroups).length ? vocabGroups : base.vocabulary.groups,
+      },
+
+      usefulSentences: {
+        stage:   'Stage 04b',
+        label:   'Useful Sentences',
+        tagline: 'Real English for real situations.',
+        groups:  Object.keys(phraseGroups).length ? phraseGroups : base.usefulSentences.groups,
+      },
+
+      exercises: {
+        stage:   'Stage 05',
+        label:   'Practice',
+        tagline: 'Recognise → Build → Communicate.',
+        stages:  exerciseStages,
+      },
+
+      guidedDialogue: {
+        stage:           'Stage 05b',
+        label:           'Guided Dialogue',
+        tagline:         'Have a conversation. Use the language.',
+        setting:         gd.setup || 'A conversation using today\'s language',
+        studentRole:     'You',
+        partnerRole:     'Partner',
+        goal:            stub.objective || 'Complete the conversation task',
+        contentType:     'CURATED_CORE',
+        dialogue:        gd.turns && gd.turns.length ? gd.turns : base.guidedDialogue.dialogue,
+        successChecklist: successChecklist,
+      },
+
+      informationGap: {
+        stage:        'Stage 05c',
+        label:        'Information Gap',
+        tagline:      'Ask questions. Fill the gaps. Solve it.',
+        contentType:  'CURATED_CORE',
+        studentHas:   igStudentHas,
+        partnerHas:   igPartnerHas,
+        instructions: ig.taskDescription || base.informationGap.instructions,
+        answerKey:    igAnswerKey,
+      },
+
+      transferChallenge: {
+        stage:    'Stage 06',
+        label:    'Transfer: New Situation',
+        tagline:  'Use what you know. No model. Just you.',
+        contentType: 'CURATED_CORE',
+        intro:    tc.instruction || base.transferChallenge.intro,
+        scenarios: tcScenarios,
+      },
+
+      rubric: {
+        dimensions: rubricDims,
+        scoreBands:  rubricBands,
+      },
+
+      reviewPlan: base.reviewPlan,
+    };
+  }
+
+  /*
+   * renderGenericLessonView(lessonId)
+   * Public entry point. Called when a PUBLISHED lesson with a body is clicked.
+   * Sets LX._activeLesson to the normalized body, resets runtime state to this
+   * lesson, then fires the standard start/resume flow.
+   */
+  function renderGenericLessonView(lessonId) {
+    const body = window.LX.lessonBodies && window.LX.lessonBodies[lessonId];
+    if (!body) {
+      // No body available — fall back to preview modal
+      _showLessonPreviewModal(lessonId);
+      return;
+    }
+
+    // Normalize the body into the engine's expected shape
+    LX._activeLesson = _buildNormalizedLesson(lessonId, body);
+
+    // Update lesson identity on state so sidebars/headers reflect it
+    st.currentLessonId = lessonId;
+
+    // Use the standard start/resume flow (persist slot stays A1-BE-LOST-PROPERTY-001
+    // as designed — all generic lessons share the single persistence slot)
+    _startOrResumeLesson(false);
   }
 
   // ══════════════════════════════════════════════════════════════════
