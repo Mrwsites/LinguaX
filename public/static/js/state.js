@@ -550,7 +550,11 @@
 
   // ── START OR RESUME LESSON ──
   function startLesson() {
-    const { attempt, isNew } = P.getOrCreateActiveAttempt();
+    // Resolve the active lesson id so each lesson gets its own persist slot.
+    const activeLessonId = (window.LX && LX._activeLesson && LX._activeLesson.id)
+      || (state && state.currentLessonId)
+      || P.LESSON_ID;
+    const { attempt, isNew } = P.getOrCreateActiveAttempt(activeLessonId);
     state.currentAttemptId = attempt.id;
     state.isReadOnly = false;
     state.readOnlyAttemptId = null;

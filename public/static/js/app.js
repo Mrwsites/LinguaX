@@ -256,9 +256,11 @@
 
   function renderLessonCards() {
     const lesson = LX.lesson_A1_001;
-    const activeAttempt = P.getActiveAttempt();
-    const latestCompleted = P.getLatestCompletedAttempt();
-    const allAttempts = P.getAllAttempts();
+    // Explicitly pass the Lost Property lesson id so this card always queries its own data.
+    const cardLessonId = lesson.id; // 'A1-BE-LOST-PROPERTY-001'
+    const activeAttempt = P.getActiveAttempt(cardLessonId);
+    const latestCompleted = P.getLatestCompletedAttempt(cardLessonId);
+    const allAttempts = P.getAllAttempts(cardLessonId);
     const completedCount = allAttempts.filter(a => a.status === 'COMPLETED').length;
 
     const col = el('div', 'dashboard-lessons');
@@ -516,10 +518,10 @@
   function renderLessonReviewView() {
     const lessonId = st.reviewLessonId || P.LESSON_ID;
     const currLesson = LX.curriculum.getLessonById(lessonId) || LX.lesson_A1_001;
-    const allAttempts = P.getAllAttempts();
+    const allAttempts = P.getAllAttempts(lessonId);
     const completedAttempts = allAttempts.filter(a => a.status === 'COMPLETED');
-    const latestCompleted = P.getLatestCompletedAttempt();
-    const activeAttempt = P.getActiveAttempt();
+    const latestCompleted = P.getLatestCompletedAttempt(lessonId);
+    const activeAttempt = P.getActiveAttempt(lessonId);
     const fam = (LX.scenarioFamilies || []).find(f => f.id === currLesson.scenarioFamily);
     const familyLabel = fam ? (fam.emoji + ' ' + fam.name) : (currLesson.scenarioFamily || '');
     const allReviews = latestCompleted ? P.getReviewEvents(latestCompleted.id) : [];
@@ -2379,7 +2381,8 @@
   // ── ATTEMPTS PAGE ──
   // ══════════════════════════════════════════════
   function renderAttemptsPage() {
-    const allAttempts = P.getAllAttempts(); // newest first
+    // renderAttemptsPage is a cross-lesson legacy view; no lessonId filter needed here
+    const allAttempts = P.getAllAttempts(P.LESSON_ID); // legacy dashboard: Lost Property only
     const completedAttempts = allAttempts.filter(a => a.status === 'COMPLETED');
 
     const div = el('div');
@@ -2471,7 +2474,7 @@
   function renderAttemptHistoryView() {
     const lessonId = st.historyLessonId || P.LESSON_ID;
     const currLesson = LX.curriculum.getLessonById(lessonId) || LX.lesson_A1_001;
-    const allAttempts = P.getAllAttempts(); // newest first
+    const allAttempts = P.getAllAttempts(lessonId); // newest first, filtered to this lesson
     const fam = (LX.scenarioFamilies || []).find(f => f.id === currLesson.scenarioFamily);
     const familyLabel = fam ? (fam.emoji + ' ' + fam.name) : (currLesson.scenarioFamily || '');
 
@@ -2502,7 +2505,7 @@
     const actionBar = el('div', 'lx-ah-action-bar');
     actionBar.innerHTML = `
       <button class="btn-start" id="ah-restart-btn" aria-label="Start a new attempt">🔄 New Attempt</button>
-      ${P.getAllAttempts().filter(a => a.status === 'COMPLETED').length >= 2
+      ${P.getAllAttempts(lessonId).filter(a => a.status === 'COMPLETED').length >= 2
         ? `<button class="btn-outline-sm" id="ah-compare-btn" aria-label="Compare attempts">📊 Compare</button>` : ''}`;
     div.appendChild(actionBar);
 
@@ -4334,7 +4337,9 @@
   // ── HELPER: Start or resume lesson ──
   function _startOrResumeLesson(forceNew) {
     if (forceNew) {
-      const attempt = P.startNewAttempt();
+      // Pass the current active lesson id so the new attempt is lesson-specific
+      const activeLessonId = LX._activeLesson?.id || st.currentLessonId || P.LESSON_ID;
+      const attempt = P.startNewAttempt(activeLessonId);
       _resetRuntimeState();
       st.currentAttemptId = attempt.id;
     } else {
@@ -5231,8 +5236,9 @@
     // Update lesson identity on state so sidebars/headers reflect it
     st.currentLessonId = lessonId;
 
-    // Use the standard start/resume flow (persist slot stays A1-BE-LOST-PROPERTY-001
-    // as designed — all generic lessons share the single persistence slot)
+    // Use the standard start/resume flow.
+    // st.currentLessonId is already set above; LX._activeLesson.id is set above.
+    // startLesson() in state.js will resolve the id and call getOrCreateActiveAttempt(lessonId).
     _startOrResumeLesson(false);
   }
 

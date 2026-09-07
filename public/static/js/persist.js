@@ -38,8 +38,37 @@
   const STORE_KEY = 'lx_store_v1';
   const ORG_ID = 'org-demo';
   const LEARNER_ID = 'learner-alex-johnson';
-  const LESSON_ID = 'A1-BE-LOST-PROPERTY-001';
+  const LESSON_ID = 'A1-BE-LOST-PROPERTY-001'; // legacy default — kept for backward compat
   const LESSON_VERSION = '1.0.0';
+
+  // Resolve lessonId: use provided value or fall back to legacy default.
+  function _lid(lessonId) {
+    return lessonId || LESSON_ID;
+  }
+
+  // Ensure a learner_assignment record exists for lessonId.
+  // Creates a minimal record on demand so generic lessons don't need pre-seeded assignments.
+  function _ensureAssignment(store, lessonId, now) {
+    if (!store.learner_assignments[lessonId]) {
+      store.learner_assignments[lessonId] = {
+        id: `assign-${lessonId}-${LEARNER_ID}`,
+        organization_id: ORG_ID,
+        lesson_id: lessonId,
+        lesson_version_id: null,
+        learner_id: LEARNER_ID,
+        assigned_by: null,
+        assigned_at: now || new Date().toISOString(),
+        due_at: null,
+        teacher_note: null,
+        status: 'NOT_STARTED',
+        current_attempt_id: null,
+        completed_at: null,
+        created_at: now || new Date().toISOString(),
+        updated_at: now || new Date().toISOString(),
+      };
+    }
+    return store.learner_assignments[lessonId];
+  }
 
   // ── STAGE STATUS CONSTANTS ──
   const STAGE_STATUS = {
@@ -180,27 +209,32 @@
   /**
    * Create a new lesson attempt. Returns the new attempt object.
    * Always creates a fresh record — never modifies existing completed attempts.
+   * @param {string} [lessonId] — lesson to create an attempt for (defaults to legacy LESSON_ID)
    */
-  function createAttempt() {
+  function createAttempt(lessonId) {
+    lessonId = _lid(lessonId);
     const store = getStore();
-    const assignment = store.learner_assignments[LESSON_ID];
-    const lessonVersionId = Object.keys(store.lesson_versions)[0];
+    const now = new Date().toISOString();
+    const assignment = _ensureAssignment(store, lessonId, now);
+    // For the legacy lesson use the existing lesson_version; for others use null or first available.
+    const lessonVersionId = lessonId === LESSON_ID
+      ? Object.keys(store.lesson_versions)[0]
+      : null;
 
     // Count existing attempts to determine attempt_number
     const existing = Object.values(store.lesson_attempts).filter(
-      a => a.lesson_id === LESSON_ID && a.learner_id === LEARNER_ID
+      a => a.lesson_id === lessonId && a.learner_id === LEARNER_ID
     );
     const attemptNumber = existing.length + 1;
 
-    const now = new Date().toISOString();
-    const attemptId = `attempt-${LESSON_ID}-${LEARNER_ID}-${Date.now()}`;
+    const attemptId = `attempt-${lessonId}-${LEARNER_ID}-${Date.now()}`;
 
     const attempt = {
       id: attemptId,
       organization_id: ORG_ID,
       assignment_id: assignment.id,
       learner_id: LEARNER_ID,
-      lesson_id: LESSON_ID,
+      lesson_id: lessonId,
       lesson_version_id: lessonVersionId,
       attempt_number: attemptNumber,
       status: 'IN_PROGRESS',
@@ -231,6 +265,7 @@
     assignment.current_attempt_id = attemptId;
     assignment.status = 'IN_PROGRESS';
     assignment.updated_at = now;
+    if (!assignment.lesson_id) assignment.lesson_id = lessonId;
 
     // Log event
     _logEvent(store, attemptId, 'ATTEMPT_STARTED', { attempt_number: attemptNumber });
@@ -242,10 +277,13 @@
   /**
    * Get or create the current in-progress attempt for the lesson.
    * Returns { attempt, isNew }
+   * @param {string} [lessonId] — lesson to look up (defaults to legacy LESSON_ID)
    */
-  function getOrCreateActiveAttempt() {
+  function getOrCreateActiveAttempt(lessonId) {
+    lessonId = _lid(lessonId);
     const store = getStore();
-    const assignment = store.learner_assignments[LESSON_ID];
+    const now = new Date().toISOString();
+    const assignment = _ensureAssignment(store, lessonId, now);
 
     if (assignment.current_attempt_id) {
       const current = store.lesson_attempts[assignment.current_attempt_id];
@@ -255,7 +293,7 @@
     }
 
     // No active attempt — create one
-    const attempt = createAttempt();
+    const attempt = createAttempt(lessonId);
     return { attempt, isNew: true };
   }
 
@@ -534,7 +572,7 @@
         scenario_family: 'community_public',
         title: 'Lost Property Desk Dialogue',
         content_source: 'CURATED_SCENARIO_BANK',
-        content_snapshot_json: { type: 'guided_dialogue', lessonId: LESSON_ID },
+        content_snapshot_json: { type: 'guided_dialogue', lessonId: attempt.lesson_id || LESSON_ID },
         validation_status: 'auto_approved',
         created_at: now,
       };
@@ -564,7 +602,8 @@
     _createReviewEvents(store, attemptId, attempt, now);
 
     // Update assignment
-    const assignment = store.learner_assignments[LESSON_ID];
+    const lessonIdForAssign = attempt.lesson_id || LESSON_ID;
+    const assignment = _ensureAssignment(store, lessonIdForAssign, now);
     assignment.status = 'COMPLETED';
     assignment.completed_at = now;
     assignment.updated_at = now;
@@ -583,16 +622,18 @@
    * Start a new attempt on an already-completed lesson.
    * Resets the assignment's current_attempt_id to a fresh attempt.
    * The old completed attempts are NEVER modified.
+   * @param {string} [lessonId] — lesson to restart (defaults to legacy LESSON_ID)
    */
-  function startNewAttempt() {
+  function startNewAttempt(lessonId) {
+    lessonId = _lid(lessonId);
     const store = getStore();
     const prev = Object.values(store.lesson_attempts).filter(
-      a => a.lesson_id === LESSON_ID && a.learner_id === LEARNER_ID
+      a => a.lesson_id === lessonId && a.learner_id === LEARNER_ID
     );
     if (prev.length === 0) {
       console.warn('[LX persist] No previous attempts to restart from.');
     }
-    const attempt = createAttempt();
+    const attempt = createAttempt(lessonId);
     return attempt;
   }
 
@@ -700,6 +741,8 @@
       },
     ];
 
+    // Tag each review event with lesson_id so _buildLearnerProgress can correlate them
+    reviewEvents.forEach(ev => { ev.lesson_id = attempt.lesson_id || LESSON_ID; });
     store.review_events[attemptId] = reviewEvents;
   }
 
@@ -719,11 +762,15 @@
 
   // ── READ HELPERS ──
 
-  /** Get all attempts for the current lesson, sorted newest first. */
-  function getAllAttempts() {
+  /**
+   * Get all attempts for a lesson, sorted newest first.
+   * @param {string} [lessonId] — defaults to legacy LESSON_ID
+   */
+  function getAllAttempts(lessonId) {
+    lessonId = _lid(lessonId);
     const store = getStore();
     return Object.values(store.lesson_attempts)
-      .filter(a => a.lesson_id === LESSON_ID && a.learner_id === LEARNER_ID)
+      .filter(a => a.lesson_id === lessonId && a.learner_id === LEARNER_ID)
       .sort((a, b) => b.attempt_number - a.attempt_number);
   }
 
@@ -787,52 +834,76 @@
   /**
    * Returns true if the lesson has at least one COMPLETED attempt AND
    * there is at least one review event with scheduled_for <= now and status !== COMPLETED.
+   * @param {string} [lessonId] — defaults to legacy LESSON_ID
    */
   function isLessonReviewDue(lessonId) {
+    lessonId = _lid(lessonId);
     const store = getStore();
     const now = new Date();
-    // Any completed attempt for this lesson?
-    const hasCompleted = Object.values(store.lesson_attempts).some(
-      a => a.lesson_id === (lessonId || LESSON_ID) && a.status === 'COMPLETED'
+    // Find completed attempts for this lesson
+    const completedAttempts = Object.values(store.lesson_attempts).filter(
+      a => a.lesson_id === lessonId && a.status === 'COMPLETED'
     );
-    if (!hasCompleted) return false;
-    // Any overdue review event?
-    const allEvents = Object.values(store.review_events).flat();
-    return allEvents.some(ev => ev.status !== 'COMPLETED' && new Date(ev.scheduled_for) <= now);
+    if (completedAttempts.length === 0) return false;
+    // Gather review events only for attempts belonging to this lesson
+    const completedAttemptIds = new Set(completedAttempts.map(a => a.id));
+    const lessonReviews = Object.entries(store.review_events)
+      .filter(([aid]) => completedAttemptIds.has(aid))
+      .flatMap(([, evts]) => evts);
+    return lessonReviews.some(ev => ev.status !== 'COMPLETED' && new Date(ev.scheduled_for) <= now);
   }
 
   /**
    * Get the next pending review event for the lesson (the earliest due one).
+   * @param {string} [lessonId] — defaults to legacy LESSON_ID
    */
   function getNextReviewEvent(lessonId) {
+    lessonId = _lid(lessonId);
     const store = getStore();
-    const now = new Date();
-    const allEvents = Object.values(store.review_events)
-      .flat()
+    // Find attempts for this lesson
+    const lessonAttemptIds = new Set(
+      Object.values(store.lesson_attempts)
+        .filter(a => a.lesson_id === lessonId)
+        .map(a => a.id)
+    );
+    const events = Object.entries(store.review_events)
+      .filter(([aid]) => lessonAttemptIds.has(aid))
+      .flatMap(([, evts]) => evts)
       .filter(ev => ev.status !== 'COMPLETED')
       .sort((a, b) => new Date(a.scheduled_for) - new Date(b.scheduled_for));
-    return allEvents[0] || null;
+    return events[0] || null;
   }
 
-  /** Get the current assignment. */
-  function getAssignment() {
+  /**
+   * Get the current assignment for a lesson.
+   * @param {string} [lessonId] — defaults to legacy LESSON_ID
+   */
+  function getAssignment(lessonId) {
+    lessonId = _lid(lessonId);
     const store = getStore();
-    return store.learner_assignments[LESSON_ID] || null;
+    return store.learner_assignments[lessonId] || null;
   }
 
-  /** Get the active (in-progress) attempt if any. */
-  function getActiveAttempt() {
+  /**
+   * Get the active (in-progress) attempt if any.
+   * @param {string} [lessonId] — defaults to legacy LESSON_ID
+   */
+  function getActiveAttempt(lessonId) {
+    lessonId = _lid(lessonId);
     const store = getStore();
-    const assignment = store.learner_assignments[LESSON_ID];
+    const assignment = store.learner_assignments[lessonId];
     if (!assignment?.current_attempt_id) return null;
     const attempt = store.lesson_attempts[assignment.current_attempt_id];
     if (!attempt || attempt.status !== 'IN_PROGRESS') return null;
     return attempt;
   }
 
-  /** Get the most recent completed attempt. */
-  function getLatestCompletedAttempt() {
-    const all = getAllAttempts();
+  /**
+   * Get the most recent completed attempt.
+   * @param {string} [lessonId] — defaults to legacy LESSON_ID
+   */
+  function getLatestCompletedAttempt(lessonId) {
+    const all = getAllAttempts(lessonId);
     return all.find(a => a.status === 'COMPLETED') || null;
   }
 
