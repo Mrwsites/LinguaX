@@ -766,15 +766,21 @@
   }
 
   // ── SCORE / RUBRIC ──
+  function _activeRubric() {
+    return (window.LX && LX._activeLesson && LX._activeLesson.rubric)
+      ? LX._activeLesson.rubric
+      : LX.lesson_A1_001.rubric;
+  }
+
   function calculateRubricScore() {
-    const dims = LX.lesson_A1_001.rubric.dimensions;
+    const dims = _activeRubric().dimensions;
     let total = 0;
     dims.forEach(dim => { total += state.rubricScores[dim.id] || 0; });
     return total;
   }
 
   function getScoreBand(score) {
-    const bands = LX.lesson_A1_001.rubric.scoreBands;
+    const bands = _activeRubric().scoreBands;
     return bands.find(b => score >= b.min && score <= b.max) || bands[0];
   }
 
@@ -814,67 +820,85 @@
     const newScores = {};
     const newEvidence = {};
 
-    // target_grammar: Practice recognition + controlled + Guided Dialogue + InfoGap
-    if (recScore !== null || ctrlScore !== null || dialogueDone || infoGapDone) {
-      const vals = [recScore, ctrlScore].filter(v => v !== null);
-      const avg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
-      newScores['target_grammar'] = Math.min(2, Math.round(avg * 2));
-      newEvidence['target_grammar'] = true;
-    }
+    // Determine which rubric dimension IDs are active for the current lesson
+    const activeDims = _activeRubric().dimensions.map(d => d.id);
+    const isGeneric = activeDims.includes('target_grammar') && !activeDims.includes('verb_be_agreement');
 
-    // verb_be_agreement: Grammar quick check + Practice recognition
-    if (grammarScore !== null || recScore !== null) {
-      const vals = [grammarScore, recScore].filter(v => v !== null);
-      const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
-      newScores['verb_be_agreement'] = Math.min(2, Math.round(avg * 2));
-      newEvidence['verb_be_agreement'] = true;
-    }
-
-    // vocabulary: Vocab check + Matching
-    if (matchScore !== null || (gcs.vocabulary && gcs.vocabulary.submitted)) {
-      const vals = [matchScore].filter(v => v !== null);
-      if (gcs.vocabulary && gcs.vocabulary.submitted && gcs.vocabulary.total > 0) {
-        vals.push(gcs.vocabulary.score / gcs.vocabulary.total);
+    // target_grammar (generic rubric): Practice recognition + controlled + Dialogue + InfoGap
+    if (activeDims.includes('target_grammar')) {
+      if (recScore !== null || ctrlScore !== null || grammarScore !== null || dialogueDone || infoGapDone) {
+        const vals = [recScore, ctrlScore, grammarScore].filter(v => v !== null);
+        const avg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+        newScores['target_grammar'] = Math.min(2, Math.round(avg * 2));
+        newEvidence['target_grammar'] = true;
       }
-      const avg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
-      newScores['vocabulary'] = Math.min(2, Math.round(avg * 2));
-      newEvidence['vocabulary'] = true;
     }
 
-    // questions_negatives: Practice controlled + Guided Dialogue
-    if (ctrlScore !== null || dialogueDone) {
-      const vals = [ctrlScore, dialogueScore].filter(v => v !== null);
-      const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
-      newScores['questions_negatives'] = Math.min(2, Math.round(avg * 2));
-      newEvidence['questions_negatives'] = true;
+    // verb_be_agreement (A1 anchor rubric): Grammar quick check + Practice recognition
+    if (activeDims.includes('verb_be_agreement')) {
+      if (grammarScore !== null || recScore !== null) {
+        const vals = [grammarScore, recScore].filter(v => v !== null);
+        const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+        newScores['verb_be_agreement'] = Math.min(2, Math.round(avg * 2));
+        newEvidence['verb_be_agreement'] = true;
+      }
     }
 
-    // meaning: Guided Dialogue + Transfer text
-    if (dialogueDone || transferDone) {
-      const vals = [];
-      if (dialogueDone) vals.push(dialogueScore);
-      if (transferDone && transferResponded) vals.push(0.8); // formative only
-      const avg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
-      newScores['meaning'] = Math.min(2, Math.round(avg * 2));
-      newEvidence['meaning'] = true;
+    // vocabulary: Vocab check + Matching (both rubric types)
+    if (activeDims.includes('vocabulary')) {
+      if (matchScore !== null || (gcs.vocabulary && gcs.vocabulary.submitted)) {
+        const vals = [matchScore].filter(v => v !== null);
+        if (gcs.vocabulary && gcs.vocabulary.submitted && gcs.vocabulary.total > 0) {
+          vals.push(gcs.vocabulary.score / gcs.vocabulary.total);
+        }
+        const avg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+        newScores['vocabulary'] = Math.min(2, Math.round(avg * 2));
+        newEvidence['vocabulary'] = true;
+      }
     }
 
-    // interaction: Guided Dialogue + InfoGap + Transfer completion
-    if (dialogueDone || infoGapDone || transferDone) {
-      const vals = [dialogueScore, infoGapScore].filter(v => v !== null);
-      if (transferDone) vals.push(transferResponded ? 1.0 : 0.5);
-      const avg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
-      newScores['interaction'] = Math.min(2, Math.round(avg * 2));
-      newEvidence['interaction'] = true;
+    // questions_negatives (A1 anchor rubric): Practice controlled + Guided Dialogue
+    if (activeDims.includes('questions_negatives')) {
+      if (ctrlScore !== null || dialogueDone) {
+        const vals = [ctrlScore, dialogueScore].filter(v => v !== null);
+        const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+        newScores['questions_negatives'] = Math.min(2, Math.round(avg * 2));
+        newEvidence['questions_negatives'] = true;
+      }
     }
 
-    // repair: Only score if a repair prompt was explicitly presented (not in this lesson yet)
+    // meaning: Guided Dialogue + Transfer text (both rubric types)
+    if (activeDims.includes('meaning')) {
+      if (dialogueDone || transferDone) {
+        const vals = [];
+        if (dialogueDone) vals.push(dialogueScore);
+        if (transferDone && transferResponded) vals.push(0.8); // formative only
+        const avg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+        newScores['meaning'] = Math.min(2, Math.round(avg * 2));
+        newEvidence['meaning'] = true;
+      }
+    }
+
+    // interaction: Guided Dialogue + InfoGap + Transfer completion (both rubric types)
+    if (activeDims.includes('interaction')) {
+      if (dialogueDone || infoGapDone || transferDone) {
+        const vals = [dialogueScore, infoGapScore].filter(v => v !== null);
+        if (transferDone) vals.push(transferResponded ? 1.0 : 0.5);
+        const avg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+        newScores['interaction'] = Math.min(2, Math.round(avg * 2));
+        newEvidence['interaction'] = true;
+      }
+    }
+
+    // repair (A1 anchor rubric): Only score if a repair prompt was explicitly presented
     // Leave as NOT_ASSESSED
 
-    // transfer: Submitted Stage 10 transfer scenario
-    if (transferDone) {
-      newScores['transfer'] = transferResponded ? (Object.values(ts.responses).filter(v => v && v.trim().length > 10).length >= 2 ? 2 : 1) : 1;
-      newEvidence['transfer'] = true;
+    // transfer (A1 anchor rubric): Submitted Stage 10 transfer scenario
+    if (activeDims.includes('transfer')) {
+      if (transferDone) {
+        newScores['transfer'] = transferResponded ? (Object.values(ts.responses).filter(v => v && v.trim().length > 10).length >= 2 ? 2 : 1) : 1;
+        newEvidence['transfer'] = true;
+      }
     }
 
     state.rubricScores = newScores;

@@ -1346,13 +1346,28 @@
       `<span class="visual-chip${m.highlight ? ' highlight' : ''}">${m.text}</span>`
     ).join('');
 
-    // Quick-check questions (is or are?)
-    const qItems = [
-      { q: 'The bag ___ black.', options: ['is', 'are'], answer: 'is', explanation: 'Use <em>is</em> with a singular noun (the bag).' },
-      { q: 'The keys ___ on the desk.', options: ['is', 'are'], answer: 'are', explanation: 'Use <em>are</em> with a plural noun (keys).' },
-      { q: 'This ___ my umbrella.', options: ['is', 'are'], answer: 'is', explanation: 'Use <em>is</em> after <em>this</em> (singular).' },
-      { q: 'These ___ her glasses.', options: ['is', 'are'], answer: 'are', explanation: 'Use <em>are</em> after <em>these</em> (plural).' },
-    ];
+    // Quick-check questions — use lesson-specific comprehensionCheck or neutral fallback
+    const _visActiveLsn = LX._activeLesson || LX.lesson_A1_001;
+    const _visIsAnchor = _visActiveLsn.id === 'A1-BE-LOST-PROPERTY-001';
+    let qItems;
+    if (_visIsAnchor) {
+      qItems = [
+        { q: 'The bag ___ black.', options: ['is', 'are'], answer: 'is', explanation: 'Use <em>is</em> with a singular noun (the bag).' },
+        { q: 'The keys ___ on the desk.', options: ['is', 'are'], answer: 'are', explanation: 'Use <em>are</em> with a plural noun (keys).' },
+        { q: 'This ___ my umbrella.', options: ['is', 'are'], answer: 'is', explanation: 'Use <em>is</em> after <em>this</em> (singular).' },
+        { q: 'These ___ her glasses.', options: ['is', 'are'], answer: 'are', explanation: 'Use <em>are</em> after <em>these</em> (plural).' },
+      ];
+    } else {
+      // Use lesson body comprehensionCheck if available
+      const _rawBody = window.LX.lessonBodies && window.LX.lessonBodies[_visActiveLsn.id];
+      const _cc = _rawBody && _rawBody.visual && _rawBody.visual.comprehensionCheck;
+      if (_cc && _cc.question && _cc.options && _cc.options.length) {
+        const _correctOpt = _cc.options[_cc.correct !== undefined ? _cc.correct : 0];
+        qItems = [{ q: _cc.question, options: _cc.options, answer: _correctOpt, explanation: `The correct answer is: <em>${_correctOpt}</em>` }];
+      } else {
+        qItems = [{ q: 'What is the main topic of this lesson?', options: ['Language in context', 'Something unrelated', 'A different topic'], answer: 'Language in context', explanation: 'This lesson focuses on using language in context.' }];
+      }
+    }
 
     const qHtml = qItems.map((q, i) => {
       const saved = cs.answers[i];
@@ -1385,7 +1400,7 @@
     </div>
     <div style="padding:0 24px 20px;font-size:13px;color:var(--grey);text-align:center;font-style:italic">"${vt.tagline}"</div>
     <div style="padding:0 24px 24px">
-      <div style="font-size:13px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px">👁️ Quick Check — is or are?</div>
+      <div style="font-size:13px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px">👁️ Quick Check</div>
       ${qHtml}
       ${!readOnly && !cs.submitted ? `<button class="btn-check" id="check-visual-stage">Check answers</button>` : ''}
       ${cs.submitted ? `<div class="exercise-feedback show ${cs.score >= 3 ? 'correct-fb' : 'incorrect-fb'}">Score: ${cs.score}/${qItems.length} — ${cs.score >= 3 ? 'Great visual observation!' : 'Review the visual cards above and try again.'}</div>` : ''}
@@ -1425,6 +1440,9 @@
         </div>`).join('')}
       </div>` : '';
 
+    const _tblActiveLsn = LX._activeLesson || LX.lesson_A1_001;
+    const _showVerbToBeTable = _tblActiveLsn.id === 'A1-BE-LOST-PROPERTY-001'
+      || (_tblActiveLsn.grammarPointIds && _tblActiveLsn.grammarPointIds.some(g => g && g.toString().toLowerCase().includes('be')));
     const tableRows = gf.verbToBeTable.rows.map(r => `
       <tr>
         <td><strong>${r.subject}</strong></td>
@@ -1433,12 +1451,26 @@
         <td class="question">${r.question}</td>
       </tr>`).join('');
 
-    // 3-question is/are quick check
-    const qItems = [
-      { q: 'Choose the correct form: "It ___ a blue bag."', options: ['is', 'are', "isn't"], answer: 'is', explanation: '<em>It</em> is singular → use <em>is</em>.' },
-      { q: 'Choose the correct form: "___ these your keys?"', options: ['Is', 'Are', "Isn't"], answer: 'Are', explanation: '<em>These</em> is plural → use <em>Are</em>.' },
-      { q: 'Choose the correct form: "The glasses ___ not mine."', options: ['is', 'are', 'be'], answer: 'are', explanation: '<em>Glasses</em> is plural → use <em>are</em>.' },
-    ];
+    // Grammar quick check — use lesson-specific quickCheck or neutral fallback
+    const _grmActiveLsn = LX._activeLesson || LX.lesson_A1_001;
+    const _grmIsAnchor = _grmActiveLsn.id === 'A1-BE-LOST-PROPERTY-001';
+    let qItems;
+    if (_grmIsAnchor) {
+      qItems = [
+        { q: 'Choose the correct form: "It ___ a blue bag."', options: ['is', 'are', "isn't"], answer: 'is', explanation: '<em>It</em> is singular → use <em>is</em>.' },
+        { q: 'Choose the correct form: "___ these your keys?"', options: ['Is', 'Are', "Isn't"], answer: 'Are', explanation: '<em>These</em> is plural → use <em>Are</em>.' },
+        { q: 'Choose the correct form: "The glasses ___ not mine."', options: ['is', 'are', 'be'], answer: 'are', explanation: '<em>Glasses</em> is plural → use <em>are</em>.' },
+      ];
+    } else {
+      const _rawBodyG = window.LX.lessonBodies && window.LX.lessonBodies[_grmActiveLsn.id];
+      const _qc = _rawBodyG && _rawBodyG.grammar && _rawBodyG.grammar.quickCheck;
+      if (_qc && _qc.question && _qc.options && _qc.options.length) {
+        const _correctOptG = _qc.options[_qc.correct !== undefined ? _qc.correct : 0];
+        qItems = [{ q: _qc.question, options: _qc.options, answer: _correctOptG, explanation: `Correct: <em>${_correctOptG}</em>` }];
+      } else {
+        qItems = [{ q: 'Which sentence uses the grammar from this lesson correctly?', options: ['Option A — correct pattern', 'Option B — wrong pattern', 'Option C — incomplete'], answer: 'Option A — correct pattern', explanation: 'Use the grammar pattern from this lesson.' }];
+      }
+    }
 
     const qHtml = qItems.map((q, i) => {
       const saved = cs.answers[i];
@@ -1466,18 +1498,19 @@
       <div class="grammar-name-tag">📐 ${gf.grammarName}</div>
       ${sectionsHtml}
       ${errorsHtml}
+      ${_showVerbToBeTable ? `
       <div style="font-size:13px;font-weight:700;color:var(--navy);margin:16px 0 10px">📊 Verb "to be" — Present Tense</div>
       <div class="grammar-table-wrap">
         <table class="grammar-table">
           <thead><tr><th>Subject</th><th>✓ Positive</th><th>✗ Negative</th><th>? Question</th></tr></thead>
           <tbody>${tableRows}</tbody>
         </table>
-      </div>
+      </div>` : ''}
       <div style="margin-top:24px;padding:16px;background:var(--purple-light);border-radius:var(--radius-md);border:1px solid var(--purple)">
-        <div style="font-size:13px;font-weight:700;color:var(--purple);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px">📐 Quick Check — is / are / are not</div>
+        <div style="font-size:13px;font-weight:700;color:var(--purple);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px">📐 Quick Check</div>
         ${qHtml}
         ${!readOnly && !cs.submitted ? `<button class="btn-check" id="check-grammar-stage">Check answers</button>` : ''}
-        ${cs.submitted ? `<div class="exercise-feedback show ${cs.score >= 2 ? 'correct-fb' : 'incorrect-fb'}">Score: ${cs.score}/${qItems.length} — ${cs.score >= 2 ? 'Good understanding of verb to be!' : 'Review the grammar table above.'}</div>` : ''}
+        ${cs.submitted ? `<div class="exercise-feedback show ${cs.score >= 2 ? 'correct-fb' : 'incorrect-fb'}">Score: ${cs.score}/${qItems.length} — ${cs.score >= 2 ? 'Good understanding of this grammar point!' : 'Review the grammar explanation above.'}</div>` : ''}
       </div>
     </div>`;
     return sectionCard('#7C3AED', gf.stage, `${gf.label}: ${gf.tagline}`, bodyHTML, navButtons(2));
@@ -1892,47 +1925,77 @@
     ).join('');
 
     // ── Part A: Choose the best response ──
-    const partAItems = [
-      {
-        context: 'A passenger approaches. They look worried.',
-        partnerSays: '"Excuse me, I think I left my bag on the train."',
-        prompt: 'What do you say as the Lost Property Officer?',
-        options: [
-          'Is this your bag? It is black.',
-          'OK, goodbye.',
-          'Are you lost?',
-          'The bag is very nice.',
-        ],
-        answer: 'Is this your bag? It is black.',
-        explanation: 'Use <em>Is this your bag?</em> (yes/no question with <em>is</em>) to confirm and describe the item.',
-      },
-      {
-        context: 'You have found a pair of glasses and some keys.',
-        partnerSays: '"I am looking for my glasses and my keys."',
-        prompt: 'What do you say?',
-        options: [
-          'The glasses and keys is here.',
-          'Are these your glasses? And are these your keys?',
-          'Is these your glasses?',
-          'Glasses are belong to you?',
-        ],
-        answer: 'Are these your glasses? And are these your keys?',
-        explanation: '<em>Are these…?</em> is correct for plural items. Use <em>are</em>, not <em>is</em>.',
-      },
-      {
-        context: 'The passenger confirms the glasses are theirs but the keys are not.',
-        partnerSays: '"The glasses are mine, but the keys are not mine."',
-        prompt: 'You confirm: whose keys are they?',
-        options: [
-          "They are not yours. It is the teacher's keys.",
-          "They are not yours. They are the teacher's keys.",
-          "They isn't yours. Keys is teacher.",
-          "Keys are not you. Teacher key.",
-        ],
-        answer: "They are not yours. They are the teacher's keys.",
-        explanation: "Use <em>are</em> for plural <em>they</em>, and <em>'s</em> for possession.",
-      },
-    ];
+    // Build from lesson-specific dialogue turns (turns where 'You' has options)
+    // Falls back to A1 anchor hardcoded items only for the anchor lesson itself.
+    const _rawTurns = gd.dialogue || [];
+    const _isAnchorLesson = (LX._activeLesson || LX.lesson_A1_001).id === 'A1-BE-LOST-PROPERTY-001';
+    let partAItems;
+    if (!_isAnchorLesson && _rawTurns.length) {
+      // Pair each "You" options-turn with its preceding partner text-turn as context
+      partAItems = [];
+      for (let _ti = 0; _ti < _rawTurns.length; _ti++) {
+        const _t = _rawTurns[_ti];
+        if (_t.options && _t.options.length) {
+          const _prev = _ti > 0 ? _rawTurns[_ti - 1] : null;
+          const _correctOpt = _t.options[_t.correct !== undefined ? _t.correct : 0];
+          partAItems.push({
+            context: _prev ? `${_prev.speaker} speaks.` : 'Listen and respond.',
+            partnerSays: _prev ? `"${_prev.text}"` : '',
+            prompt: 'Choose the best response.',
+            options: _t.options,
+            answer: _correctOpt,
+            explanation: `The best response is: <em>${_correctOpt}</em>`,
+          });
+        }
+      }
+      // If no option-turns found, show a single neutral fallback so Part A doesn't crash
+      if (!partAItems.length) {
+        partAItems = [{ context: 'Practise the key language from this lesson.', partnerSays: '', prompt: 'Which phrase is correct?', options: ['OK.', 'Wrong.', 'Bad.'], answer: 'OK.', explanation: 'Use a positive response.' }];
+      }
+    } else {
+      // A1 anchor lesson (or no turns) — use original hardcoded Lost Property items
+      partAItems = [
+        {
+          context: 'A passenger approaches. They look worried.',
+          partnerSays: '"Excuse me, I think I left my bag on the train."',
+          prompt: 'What do you say as the Lost Property Officer?',
+          options: [
+            'Is this your bag? It is black.',
+            'OK, goodbye.',
+            'Are you lost?',
+            'The bag is very nice.',
+          ],
+          answer: 'Is this your bag? It is black.',
+          explanation: 'Use <em>Is this your bag?</em> (yes/no question with <em>is</em>) to confirm and describe the item.',
+        },
+        {
+          context: 'You have found a pair of glasses and some keys.',
+          partnerSays: '"I am looking for my glasses and my keys."',
+          prompt: 'What do you say?',
+          options: [
+            'The glasses and keys is here.',
+            'Are these your glasses? And are these your keys?',
+            'Is these your glasses?',
+            'Glasses are belong to you?',
+          ],
+          answer: 'Are these your glasses? And are these your keys?',
+          explanation: '<em>Are these…?</em> is correct for plural items. Use <em>are</em>, not <em>is</em>.',
+        },
+        {
+          context: 'The passenger confirms the glasses are theirs but the keys are not.',
+          partnerSays: '"The glasses are mine, but the keys are not mine."',
+          prompt: 'You confirm: whose keys are they?',
+          options: [
+            "They are not yours. It is the teacher's keys.",
+            "They are not yours. They are the teacher's keys.",
+            "They isn't yours. Keys is teacher.",
+            "Keys are not you. Teacher key.",
+          ],
+          answer: "They are not yours. They are the teacher's keys.",
+          explanation: "Use <em>are</em> for plural <em>they</em>, and <em>'s</em> for possession.",
+        },
+      ];
+    }
 
     const partAHtml = partAItems.map((item, i) => {
       const saved = ds.partAChoices[i];
@@ -1960,11 +2023,27 @@
     }).join('');
 
     // ── Part B: Complete the dialogue frames ──
-    const partBItems = [
-      { label: 'Greet the passenger and ask if they lost something.', placeholder: 'e.g. "Hello! Is this your bag? It is blue."', hint: 'Use: Is this your ___? It is ___.' },
-      { label: 'The passenger says the umbrella is not theirs. Ask if it belongs to the teacher.', placeholder: 'e.g. "Are these the teacher\'s keys?"', hint: "Use: Is it ___'s ___?" },
-      { label: 'Confirm the bag is found and say who it belongs to.', placeholder: 'e.g. "This is Maria\'s bag. It is not yours."', hint: "Use: This is ___'s ___. It is not yours." },
-    ];
+    // Build from lesson-specific partB data; fall back to Lost Property for anchor lesson only.
+    const _rawPartB = gd.partB || [];
+    let partBItems;
+    if (!_isAnchorLesson && _rawPartB.length) {
+      partBItems = _rawPartB.map(pb => ({
+        label: pb.frame || 'Respond to the situation.',
+        placeholder: pb.answer ? `e.g. "${pb.answer}"` : 'Write your response here.',
+        hint: pb.hint || 'Use the language from this lesson.',
+      }));
+    } else if (!_isAnchorLesson) {
+      // Generic lesson with no partB data — single neutral frame
+      partBItems = [
+        { label: 'Practise the useful language from this lesson in a short response.', placeholder: 'Write your response here.', hint: 'Use the key phrases from this lesson.' },
+      ];
+    } else {
+      partBItems = [
+        { label: 'Greet the passenger and ask if they lost something.', placeholder: 'e.g. "Hello! Is this your bag? It is blue."', hint: 'Use: Is this your ___? It is ___.' },
+        { label: 'The passenger says the umbrella is not theirs. Ask if it belongs to the teacher.', placeholder: 'e.g. "Are these the teacher\'s keys?"', hint: "Use: Is it ___'s ___?" },
+        { label: 'Confirm the bag is found and say who it belongs to.', placeholder: 'e.g. "This is Maria\'s bag. It is not yours."', hint: "Use: This is ___'s ___. It is not yours." },
+      ];
+    }
 
     const partBHtml = partBItems.map((frame, i) => {
       const saved = ds.partBFrames[i] || '';
@@ -2019,7 +2098,7 @@
 
       <div style="margin-bottom:24px">
         <div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px">Part B — Complete the Dialogue Frames</div>
-        <div style="font-size:12px;color:var(--grey);margin-bottom:14px;font-style:italic">Write your own response for each situation. Use <em>is / are / 's</em> and yes/no questions.</div>
+        <div style="font-size:12px;color:var(--grey);margin-bottom:14px;font-style:italic">Write your own response for each situation. Use the key language from this lesson.</div>
         ${partBHtml}
         ${!readOnly && !ds.partBChecked
           ? `<button class="btn-check" id="check-dialogue-partB">Submit Part B</button>`
@@ -3956,49 +4035,66 @@
     if (checkDialogueA) {
       checkDialogueA.addEventListener('click', () => {
         if (st.isReadOnly) return;
-        const partAItems = [
-          { answer: 'Is this your bag? It is black.' },
-          { answer: 'Are these your glasses? And are these your keys?' },
-          { answer: "They are not yours. They are the teacher's keys." },
-        ];
+        // Resolve Part A answer key from the active lesson's dialogue turns
+        const _activeLsn = LX._activeLesson || LX.lesson_A1_001;
+        const _isAnc = _activeLsn.id === 'A1-BE-LOST-PROPERTY-001';
+        const _turns = _activeLsn.guidedDialogue && _activeLsn.guidedDialogue.dialogue || [];
+        let _answerKey;
+        if (!_isAnc && _turns.length) {
+          _answerKey = _turns
+            .filter(t => t.options && t.options.length)
+            .map(t => ({ answer: t.options[t.correct !== undefined ? t.correct : 0] }));
+        } else {
+          _answerKey = [
+            { answer: 'Is this your bag? It is black.' },
+            { answer: 'Are these your glasses? And are these your keys?' },
+            { answer: "They are not yours. They are the teacher's keys." },
+          ];
+        }
         let correct = 0;
-        partAItems.forEach((q, i) => {
+        _answerKey.forEach((q, i) => {
           if (st.dialogueState.partAChoices[i] === q.answer) correct++;
         });
         st.dialogueState.partAChecked = true;
         st.dialogueState.partAScore = correct;
-        st.dialogueState.partATotal = partAItems.length;
+        st.dialogueState.partATotal = _answerKey.length;
         _updateDialogueStatus();
         render();
       });
     }
 
-    // Dialogue Part B frames — track input
-    [0, 1, 2].forEach(i => {
-      const frame = document.getElementById(`frame-${i}`);
+    // Dialogue Part B frames — track input (up to 10 frames)
+    for (let _fi = 0; _fi < 10; _fi++) {
+      const frame = document.getElementById(`frame-${_fi}`);
       if (frame) {
         frame.addEventListener('input', () => {
           if (st.isReadOnly) return;
-          st.dialogueState.partBFrames[i] = frame.value;
+          st.dialogueState.partBFrames[_fi] = frame.value;
           LX.scheduleAutoSave();
         });
       }
-    });
+    }
 
     // Dialogue Part B submit
     const checkDialogueB = document.getElementById('check-dialogue-partB');
     if (checkDialogueB) {
       checkDialogueB.addEventListener('click', () => {
         if (st.isReadOnly) return;
+        // Resolve how many frames exist from the active lesson's partB
+        const _activeLsn2 = LX._activeLesson || LX.lesson_A1_001;
+        const _isAnc2 = _activeLsn2.id === 'A1-BE-LOST-PROPERTY-001';
+        const _partB2 = _activeLsn2.guidedDialogue && _activeLsn2.guidedDialogue.partB || [];
+        const _frameCount2 = (!_isAnc2 && _partB2.length) ? _partB2.length : 3;
         // Collect current frame values
-        [0, 1, 2].forEach(i => {
-          const f = document.getElementById(`frame-${i}`);
-          if (f) st.dialogueState.partBFrames[i] = f.value;
-        });
-        const frameCount = [0, 1, 2].filter(i => (st.dialogueState.partBFrames[i] || '').trim().length > 0).length;
+        for (let _i2 = 0; _i2 < _frameCount2; _i2++) {
+          const f = document.getElementById(`frame-${_i2}`);
+          if (f) st.dialogueState.partBFrames[_i2] = f.value;
+        }
+        const filled = Array.from({ length: _frameCount2 }, (_, i) => i)
+          .filter(i => (st.dialogueState.partBFrames[i] || '').trim().length > 0).length;
         st.dialogueState.partBChecked = true;
-        st.dialogueState.partBScore = frameCount;
-        st.dialogueState.partBTotal = 3;
+        st.dialogueState.partBScore = filled;
+        st.dialogueState.partBTotal = _frameCount2;
         _updateDialogueStatus();
         render();
       });
@@ -4080,7 +4176,7 @@
             score,
           },
           score,
-          maxScore: 16,
+          maxScore: (_activeRubricMaxScore = (() => { const _ar = LX._activeLesson || LX.lesson_A1_001; return _ar.rubric ? _ar.rubric.dimensions.reduce((s, d) => s + (d.max || 0), 0) : 16; })()),
           feedback: band.desc,
         });
 
@@ -4574,7 +4670,15 @@
 
     // Determine correct answers from stage-specific question set
     const qItems = _getStageCheckQuestions(stageKey);
-    if (!qItems) return;
+    if (!qItems) {
+      // No answer key for this stage in this lesson — mark as COMPLETED by view
+      cs.submitted = true;
+      cs.score = 1;
+      cs.total = 1;
+      LX.updateStageStatus(stageKey, { status: 'COMPLETED', responseData: { ...cs }, score: 1, maxScore: 1 });
+      render();
+      return;
+    }
 
     let correct = 0;
     qItems.forEach((q, i) => {
@@ -4598,25 +4702,51 @@
   }
 
   function _getStageCheckQuestions(stageKey) {
-    const maps = {
-      visual: [
-        { answer: 'is' }, { answer: 'are' }, { answer: 'is' }, { answer: 'are' }
-      ],
-      grammar: [
-        { answer: 'is' }, { answer: 'Are' }, { answer: 'are' }
-      ],
-      coresentence: [
-        { answer: 'is' }, { answer: 'keys' }, { answer: "Sarah's" }
-      ],
-      vocabulary: [
-        { answer: 'a place for forgotten items' }, { answer: 'to be owned by someone' },
-        { answer: 'to say what something looks like' }, { answer: 'to say something is yours' }
-      ],
-      phrases: [
-        { answer: 'Is this your bag?' }, { answer: 'The keys are not mine.' }, { answer: "It is Sarah's umbrella." }
-      ],
-    };
-    return maps[stageKey] || null;
+    const _scqActiveLsn = LX._activeLesson || LX.lesson_A1_001;
+    const _scqIsAnchor = _scqActiveLsn.id === 'A1-BE-LOST-PROPERTY-001';
+
+    if (_scqIsAnchor) {
+      // Original hardcoded Lost Property answer keys
+      const maps = {
+        visual: [
+          { answer: 'is' }, { answer: 'are' }, { answer: 'is' }, { answer: 'are' }
+        ],
+        grammar: [
+          { answer: 'is' }, { answer: 'Are' }, { answer: 'are' }
+        ],
+        coresentence: [
+          { answer: 'is' }, { answer: 'keys' }, { answer: "Sarah's" }
+        ],
+        vocabulary: [
+          { answer: 'a place for forgotten items' }, { answer: 'to be owned by someone' },
+          { answer: 'to say what something looks like' }, { answer: 'to say something is yours' }
+        ],
+        phrases: [
+          { answer: 'Is this your bag?' }, { answer: 'The keys are not mine.' }, { answer: "It is Sarah's umbrella." }
+        ],
+      };
+      return maps[stageKey] || null;
+    }
+
+    // Generic lesson: derive answer key from lesson body quick-check data
+    const _rawBodySCQ = window.LX.lessonBodies && window.LX.lessonBodies[_scqActiveLsn.id];
+    if (stageKey === 'visual') {
+      const _cc = _rawBodySCQ && _rawBodySCQ.visual && _rawBodySCQ.visual.comprehensionCheck;
+      if (_cc && _cc.options && _cc.options.length) {
+        return [{ answer: _cc.options[_cc.correct !== undefined ? _cc.correct : 0] }];
+      }
+      return [{ answer: 'Language in context' }];
+    }
+    if (stageKey === 'grammar') {
+      const _qc = _rawBodySCQ && _rawBodySCQ.grammar && _rawBodySCQ.grammar.quickCheck;
+      if (_qc && _qc.options && _qc.options.length) {
+        return [{ answer: _qc.options[_qc.correct !== undefined ? _qc.correct : 0] }];
+      }
+      return [{ answer: 'Option A — correct pattern' }];
+    }
+    // coresentence, vocabulary, phrases: return null → checkStageActivity skips scoring
+    // (stage is marked COMPLETED by navigation, not by a strict answer check)
+    return null;
   }
 
   // ── EXERCISE CHECKING ──
@@ -4943,7 +5073,8 @@
       });
     }
 
-    if (pr.controlled && pr.controlled.length) {
+    var ctrlItems = pr.controlledProduction || pr.controlled || [];
+    if (ctrlItems.length) {
       exerciseStages.push({
         id: 'controlled_production',
         num: exerciseStages.length + 1,
@@ -4951,7 +5082,7 @@
         title: 'Complete the sentences',
         prompt: 'Write the correct word or phrase.',
         contentType: 'CURATED_CORE',
-        items: pr.controlled.map(function(c) {
+        items: ctrlItems.map(function(c) {
           return {
             template: c.prompt,
             answer: c.answer,
@@ -4961,7 +5092,8 @@
       });
     }
 
-    if (pr.transform && pr.transform.length) {
+    var transformItems = pr.questionTransform || pr.transform || [];
+    if (transformItems.length) {
       exerciseStages.push({
         id: 'question_transform',
         num: exerciseStages.length + 1,
@@ -4969,7 +5101,7 @@
         title: 'Transform the sentences',
         prompt: 'Change each sentence as instructed.',
         contentType: 'CURATED_CORE',
-        items: pr.transform.map(function(t) {
+        items: transformItems.map(function(t) {
           return {
             statement: t.statement || t.prompt,
             answer: t.answer,
@@ -5184,6 +5316,7 @@
         goal:            stub.objective || 'Complete the conversation task',
         contentType:     'CURATED_CORE',
         dialogue:        gd.turns && gd.turns.length ? gd.turns : base.guidedDialogue.dialogue,
+        partB:           gd.partB && gd.partB.length ? gd.partB : (base.guidedDialogue.partB || []),
         successChecklist: successChecklist,
       },
 
