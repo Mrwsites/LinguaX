@@ -564,7 +564,7 @@
         <div class="sidebar-card-title" style="margin-bottom:14px">📝 Last Attempt Summary — Attempt ${latestCompleted.attempt_number}</div>
         <div class="lx-review-stats-grid">
           <div class="lx-review-stat">
-            <div class="lx-review-stat-val" style="color:var(--green)">${latestCompleted.total_score !== null ? latestCompleted.total_score + '/16' : '—'}</div>
+            <div class="lx-review-stat-val" style="color:var(--green)">${latestCompleted.total_score !== null ? latestCompleted.total_score + '/' + (dims.reduce((s,d)=>s+(d.max||0),0)) : '—'}</div>
             <div class="lx-review-stat-label">Overall Score</div>
           </div>
           <div class="lx-review-stat">
@@ -1184,7 +1184,7 @@
     const map = el('div', 'lesson-map');
     map.innerHTML = `
     <div class="lesson-map-title">📋 ${lesson.title}</div>
-    <div class="lesson-map-obj" style="font-size:12px;color:var(--accent);font-weight:600">A1 · ${lesson.estimatedMinutes} min</div>
+    <div class="lesson-map-obj" style="font-size:12px;color:var(--accent);font-weight:600">${lesson.cefrLevel || 'A1'} · ${lesson.estimatedMinutes} min</div>
     <div class="lesson-map-obj">${lesson.objective}</div>
     <div style="margin:8px 0;padding:8px 10px;background:var(--grey-bg);border-radius:6px;font-size:12px;color:var(--grey)">
       <div id="lx-progress-count">${prog.count} of ${prog.total} learning stages</div>
@@ -1209,7 +1209,7 @@
     const card = el('div', 'lesson-header-card');
     card.innerHTML = `
     <div class="lesson-header-meta">
-      <span class="cefr-badge cefr-a1">A1</span>
+      <span class="cefr-badge cefr-${(lesson.cefrLevel || 'A1').toLowerCase()}">${lesson.cefrLevel || 'A1'}</span>
       <span style="font-size:12px;color:rgba(255,255,255,0.6)">⏱ ${lesson.estimatedMinutes} min</span>
       <span style="font-size:12px;color:rgba(255,255,255,0.6)">🏛️ ${lesson.scenarioFamilyName}</span>
       <span style="font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.9);font-weight:600">ID: ${lesson.id}</span>
@@ -1292,7 +1292,7 @@
         </div>
         <div style="background:var(--green-light);border-radius:var(--radius-md);padding:16px;border:1px solid var(--green)">
           <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px">📐 Grammar Focus</div>
-          <div style="font-size:13px;color:var(--navy);line-height:1.5">Present simple of <strong>to be</strong>: <strong>is / are</strong><br>Possession with <strong>'s</strong><br>Yes/no questions with <strong>Is / Are</strong></div>
+          <div style="font-size:13px;color:var(--navy);line-height:1.5">${(lesson.grammarFocus && lesson.grammarFocus.grammarName) ? lesson.grammarFocus.grammarName : ((lesson.grammarPointIds && lesson.grammarPointIds.length) ? lesson.grammarPointIds.join(', ') : 'See grammar stage')}</div>
         </div>
         <div style="background:var(--amber-light);border-radius:var(--radius-md);padding:16px;border:1px solid var(--amber)">
           <div style="font-size:11px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px">📦 Core Sentences</div>
@@ -1300,7 +1300,7 @@
         </div>
         <div style="background:var(--purple-light);border-radius:var(--radius-md);padding:16px;border:1px solid var(--purple)">
           <div style="font-size:11px;font-weight:700;color:var(--purple);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px">🎭 Final Scenario</div>
-          <div style="font-size:13px;color:var(--navy);line-height:1.5">Lost property desk → 4 transfer scenarios<br><strong>${P.INSTRUCTIONAL_STAGE_COUNT} learning stages</strong> from grammar to transfer</div>
+          <div style="font-size:13px;color:var(--navy);line-height:1.5">${lesson.transferChallenge && lesson.transferChallenge.scenarios && lesson.transferChallenge.scenarios[0] ? (lesson.transferChallenge.scenarios[0].setting || lesson.transferChallenge.intro || 'Transfer challenge') : (lesson.transferChallenge && lesson.transferChallenge.intro ? lesson.transferChallenge.intro : 'Transfer challenge')}<br><strong>${P.INSTRUCTIONAL_STAGE_COUNT} learning stages</strong> from grammar to transfer</div>
         </div>
       </div>
       <div style="font-size:13px;font-weight:700;color:var(--grey);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px">What you will do in this lesson (${P.INSTRUCTIONAL_STAGE_COUNT} stages):</div>
@@ -2284,11 +2284,17 @@
       </div>`;
     }).join('');
 
-    const statusClass = score >= 14 ? 'independent' : score >= 11 ? 'functional' : score >= 6 ? 'emerging' : '';
+    // Compute the real max score from the active lesson's rubric
+    const _activeLsnFb = LX._activeLesson || LX.lesson_A1_001;
+    const _maxScoreFb = _activeLsnFb.rubric ? _activeLsnFb.rubric.dimensions.reduce((s, d) => s + (d.max || 0), 0) : 8;
+    const _halfMax = Math.floor(_maxScoreFb * 0.875);
+    const _threeQ  = Math.floor(_maxScoreFb * 0.6875);
+    const _quarter = Math.floor(_maxScoreFb * 0.375);
+    const statusClass = score >= _halfMax ? 'independent' : score >= _threeQ ? 'functional' : score >= _quarter ? 'emerging' : '';
 
     // Attempt saved panel
     const attempt = st.currentAttemptId ? P.getAttempt(st.currentAttemptId) : null;
-    const tc = (LX._activeLesson || LX.lesson_A1_001).transferChallenge;
+    const tc = (_activeLsnFb).transferChallenge;
     const scenarioTitle = tc.scenarios[st.transferState.selectedScenario]?.title || '—';
     const attemptSavedPanel = !st.isReadOnly && attempt ? `
     <div style="margin-bottom:20px;padding:16px;background:var(--navy);border-radius:var(--radius-md);color:white">
@@ -2297,7 +2303,7 @@
         <div>Started: ${P.formatDateTime(attempt.started_at)}</div>
         <div>Saved: ${P.formatDateTime(attempt.last_saved_at)}</div>
         <div>Transfer scenario: ${scenarioTitle}</div>
-        <div>Score so far: ${score}/16 — ${band.label}</div>
+        <div>Score so far: ${score}/${_maxScoreFb} — ${band.label}</div>
       </div>
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn-outline-sm" id="view-attempts-btn" style="color:white;border-color:rgba(255,255,255,0.4)">View all attempts</button>
@@ -2320,7 +2326,7 @@
       </div>
       <div class="rubric-score-hero">
         <div class="rubric-score-label">Your Score (evidence-based)</div>
-        <div><span class="rubric-score-num">${score}</span><span class="rubric-score-max"> / 16</span></div>
+        <div><span class="rubric-score-num">${score}</span><span class="rubric-score-max"> / ${_maxScoreFb}</span></div>
         <div class="rubric-score-status ${statusClass}">${band.label}</div>
       </div>
       <div style="margin-bottom:20px;padding:14px 16px;background:var(--grey-bg);border-radius:var(--radius-md);border-left:4px solid ${band.color}">
@@ -2333,13 +2339,13 @@
       <div class="feedback-text-block">
         <div class="feedback-text-title">💬 Feedback</div>
         <div class="feedback-text">
-          ${score >= 14
-            ? "Excellent work! You used is/are consistently and correctly, formed questions naturally, and completed the transfer challenge in a new context. You are ready to advance. Your review is scheduled."
-            : score >= 11
-            ? "Good progress! Your grammar is mostly accurate. Focus on forming questions more naturally and using isn't/aren't in context. Try the expansion scenario again."
-            : score >= 6
-            ? "You are on your way! Review the grammar focus section and try the guided dialogue again. Pay attention to is (singular) vs are (plural)."
-            : "Let's start again together. Go back to the Grammar Focus section. Look at the verb-to-be table. Try the recognition exercises again before the dialogue."}
+          ${score >= _halfMax
+            ? "Excellent work! You completed all stages and demonstrated confident use of the key language. Your review schedule has been set."
+            : score >= _threeQ
+            ? "Good progress! Review the key vocabulary and grammar from this lesson, then practise the guided dialogue again."
+            : score >= _quarter
+            ? "You are building useful progress. Review the key language from this lesson and try the practice again."
+            : "Let's build from here. Go back to the Grammar Focus and Vocabulary sections. Revisit the exercises before the dialogue."}
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
@@ -2349,7 +2355,13 @@
         </div>
         <div style="padding:14px;background:var(--amber-light);border-radius:var(--radius-md);border:1px solid var(--amber)">
           <div style="font-size:12px;font-weight:700;color:var(--amber);margin-bottom:8px">🎯 Focus next time:</div>
-          <div style="font-size:13px;color:var(--navy);line-height:1.6">• Check is/are agreement with subject number<br>• Invert is/are to form questions<br>• Use 's correctly for possession</div>
+          <div style="font-size:13px;color:var(--navy);line-height:1.6">${(function(){
+            var al = LX._activeLesson || LX.lesson_A1_001;
+            if (al.grammarPointIds && al.grammarPointIds.length) {
+              return al.grammarPointIds.map(function(g){ return '• Review: ' + g; }).join('<br>');
+            }
+            return '• Review the key grammar from this lesson<br>• Practise the vocabulary with a partner<br>• Use the language in a real situation';
+          })()}</div>
         </div>
       </div>
       <div style="margin-top:20px;padding:14px 16px;background:var(--navy);border-radius:var(--radius-md);color:white">
@@ -2412,7 +2424,7 @@
     <div style="margin-bottom:20px;padding:16px;background:var(--green-light);border-radius:var(--radius-md);border:1px solid var(--green)">
       <div style="font-size:14px;font-weight:700;color:var(--green);margin-bottom:6px">🎉 Attempt ${attempt.attempt_number} — Complete!</div>
       <div style="font-size:13px;color:var(--navy);margin-bottom:8px">
-        Score: ${attempt.total_score !== null ? attempt.total_score + '/16' : '—'} · 
+        Score: ${attempt.total_score !== null ? attempt.total_score + '/' + ((LX._activeLesson || LX.lesson_A1_001).rubric ? (LX._activeLesson || LX.lesson_A1_001).rubric.dimensions.reduce((s,d)=>s+(d.max||0),0) : 8) : '—'} · 
         Result: <strong>${P.getResultBandLabel(attempt.result_band)}</strong> · 
         Duration: ${P.formatDuration(attempt.active_duration_seconds || attempt.duration_seconds)}
       </div>
@@ -3502,7 +3514,7 @@
         const lessonId = card.dataset.lessonId;
         if (action === 'start') _startOrResumeLesson(false);
         else if (action === 'continue') _startOrResumeLesson(false);
-        else if (action === 'review') navigate('/lesson/' + (lessonId || 'A1-BE-LOST-PROPERTY-001') + '/review');
+        else if (action === 'review') navigate('/lesson/' + (lessonId || st.currentLessonId || 'A1-BE-LOST-PROPERTY-001') + '/review');
       };
       card.addEventListener('click', (e) => {
         // Only fire if the click target is NOT an inner button/link
@@ -3552,7 +3564,7 @@
         const lessonId = btn.dataset.lessonId;
         if (action === 'start') _startOrResumeLesson(false);
         else if (action === 'continue') _startOrResumeLesson(false);
-        else if (action === 'review') navigate('/lesson/' + (lessonId || 'A1-BE-LOST-PROPERTY-001') + '/review');
+        else if (action === 'review') navigate('/lesson/' + (lessonId || st.currentLessonId || 'A1-BE-LOST-PROPERTY-001') + '/review');
       });
     });
 
@@ -3563,7 +3575,7 @@
         const action = btn.dataset.cardAction;
         const lessonId = btn.dataset.lessonId;
         if (action === 'continue') _startOrResumeLesson(false);
-        else if (action === 'review') navigate('/lesson/' + (lessonId || 'A1-BE-LOST-PROPERTY-001') + '/review');
+        else if (action === 'review') navigate('/lesson/' + (lessonId || st.currentLessonId || 'A1-BE-LOST-PROPERTY-001') + '/review');
       });
     });
 
@@ -3574,7 +3586,7 @@
         const action = btn.dataset.cardAction;
         const lessonId = btn.dataset.lessonId;
         if (action === 'continue') _startOrResumeLesson(false);
-        else if (action === 'review') navigate('/lesson/' + (lessonId || 'A1-BE-LOST-PROPERTY-001') + '/review');
+        else if (action === 'review') navigate('/lesson/' + (lessonId || st.currentLessonId || 'A1-BE-LOST-PROPERTY-001') + '/review');
         else if (action === 'start') _startOrResumeLesson(false);
       });
     });
@@ -3584,7 +3596,7 @@
     if (reviewLessonBtn) {
       reviewLessonBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const lid = reviewLessonBtn.dataset.lessonId || 'A1-BE-LOST-PROPERTY-001';
+        const lid = reviewLessonBtn.dataset.lessonId || st.currentLessonId || (LX._activeLesson && LX._activeLesson.id) || 'A1-BE-LOST-PROPERTY-001';
         navigate('/lesson/' + lid + '/review');
       });
     }
@@ -3635,7 +3647,17 @@
 
     // ── LESSON REVIEW PAGE buttons — Module D ──
     const reviewBackBtn = document.getElementById('review-back-dashboard-btn');
-    if (reviewBackBtn) reviewBackBtn.addEventListener('click', () => navigate(''));
+    if (reviewBackBtn) reviewBackBtn.addEventListener('click', () => {
+      // Return to the level path for the reviewed lesson, not always the dashboard
+      const _rvwId = st.reviewLessonId || (LX._activeLesson && LX._activeLesson.id);
+      const _rvwLevel = _rvwId ? (function(lid) {
+        var stub = LX.curriculum && LX.curriculum.getLessonById && LX.curriculum.getLessonById(lid);
+        if (stub && stub.cefrLevel) return stub.cefrLevel;
+        var m = lid.match(/^([A-C][0-2])/);
+        return m ? m[1] : null;
+      })(_rvwId) : null;
+      navigate(_rvwLevel ? '/path/' + _rvwLevel : '');
+    });
 
     const reviewGoLessonBtn = document.getElementById('review-go-lesson-btn');
     if (reviewGoLessonBtn) {
@@ -3846,9 +3868,21 @@
     if (saveExitBtn) {
       saveExitBtn.addEventListener('click', () => {
         LX.saveAndExit(() => {
-          st.currentView = 'dashboard';
-          location.hash = '';
-          render();
+          // Return to the level path that owns this lesson, not always the dashboard
+          const _exitId = st.currentLessonId || (LX._activeLesson && LX._activeLesson.id);
+          const _exitLevel = _exitId ? (function(lid) {
+            var stub = LX.curriculum && LX.curriculum.getLessonById && LX.curriculum.getLessonById(lid);
+            if (stub && stub.cefrLevel) return stub.cefrLevel;
+            var m = lid.match(/^([A-C][0-2])/);
+            return m ? m[1] : null;
+          })(_exitId) : null;
+          if (_exitLevel) {
+            navigate('/path/' + _exitLevel);
+          } else {
+            st.currentView = 'dashboard';
+            location.hash = '';
+            render();
+          }
         });
       });
     }
@@ -3921,9 +3955,21 @@
         }
         st.isReadOnly = false;
         st.readOnlyAttemptId = null;
-        st.currentView = 'dashboard';
-        location.hash = '';
-        render();
+        // Return to the level path for the completed lesson
+        const _doneId = st.currentLessonId || (LX._activeLesson && LX._activeLesson.id);
+        const _doneLevel = _doneId ? (function(lid) {
+          var stub = LX.curriculum && LX.curriculum.getLessonById && LX.curriculum.getLessonById(lid);
+          if (stub && stub.cefrLevel) return stub.cefrLevel;
+          var m = lid.match(/^([A-C][0-2])/);
+          return m ? m[1] : null;
+        })(_doneId) : null;
+        if (_doneLevel) {
+          navigate('/path/' + _doneLevel);
+        } else {
+          st.currentView = 'dashboard';
+          location.hash = '';
+          render();
+        }
       });
     }
 
@@ -5111,9 +5157,27 @@
       });
     }
 
-    // Ensure at least one exercise stage so the engine doesn't break
+    // Ensure at least one exercise stage so the engine doesn't break — use neutral, NOT A1 Lost Property
     if (!exerciseStages.length) {
-      exerciseStages.push(base.exercises.stages[0]);
+      exerciseStages.push({
+        id: 'recognition',
+        num: 1,
+        type: 'Recognition',
+        title: 'Review',
+        prompt: 'Recall the key language from this lesson.',
+        contentType: 'CURATED_CORE',
+        items: body.vocabulary && body.vocabulary.length
+          ? body.vocabulary.slice(0, 2).map(function(v) {
+              return {
+                sentence: 'What does "' + v.word + '" mean?',
+                blank: 0,
+                options: [v.definition, 'an unrelated word', 'something else'],
+                answer: v.definition,
+                explanation: '"' + v.word + '" means: ' + v.definition,
+              };
+            })
+          : [{ sentence: 'Which phrase is from this lesson?', blank: 0, options: ['Option A', 'Option B', 'Option C'], answer: 'Option A', explanation: 'Review the lesson vocabulary.' }],
+      });
     }
 
     /* ── Guided Dialogue ── */
@@ -5127,7 +5191,12 @@
         'You completed the conversation task',
       ];
     } else {
-      successChecklist = base.guidedDialogue.successChecklist;
+      // Neutral checklist — do NOT use A1 Lost Property anchor checklist
+      successChecklist = [
+        'You used the key phrases from this lesson',
+        'You responded clearly and appropriately',
+        'You completed the conversation task',
+      ];
     }
 
     /* ── Information Gap ── */
@@ -5154,9 +5223,24 @@
         return { object: s.object, owner: owner, sentence: 'The ' + s.object + ' belongs to ' + owner + '.' };
       });
     } else {
-      igStudentHas = base.informationGap.studentHas;
-      igPartnerHas = base.informationGap.partnerHas;
-      igAnswerKey  = base.informationGap.answerKey;
+      // Build neutral info gap from vocabulary if available — do NOT use A1 Lost Property data
+      if (body.vocabulary && body.vocabulary.length >= 2) {
+        igStudentHas = body.vocabulary.slice(0, 2).map(function(v, i) {
+          return { emoji: v.emoji || ['📝','🔑','📱','🎫'][i % 4], object: v.word, description: v.definition || v.word };
+        });
+        igPartnerHas = body.vocabulary.slice(2, 4).length
+          ? body.vocabulary.slice(2, 4).map(function(v, i) { return { object: v.word, owner: 'Partner ' + (i + 1) }; })
+          : igStudentHas.map(function(s, i) { return { object: s.object, owner: 'Partner ' + (i + 1) }; });
+        igAnswerKey = igStudentHas.map(function(s, i) {
+          var owner = igPartnerHas[i] ? igPartnerHas[i].owner : 'someone';
+          return { object: s.object, owner: owner, sentence: '"' + s.object + '" — ' + (s.description || s.object) };
+        });
+      } else {
+        // Truly minimal neutral fallback
+        igStudentHas = [{ emoji: '📝', object: 'word A', description: 'from this lesson' }, { emoji: '📖', object: 'word B', description: 'from this lesson' }];
+        igPartnerHas = [{ object: 'word A', owner: 'Partner 1' }, { object: 'word B', owner: 'Partner 2' }];
+        igAnswerKey  = [{ object: 'word A', owner: 'Partner 1', sentence: 'Ask your partner the meaning of the word.' }, { object: 'word B', owner: 'Partner 2', sentence: 'Ask your partner the meaning of the word.' }];
+      }
     }
 
     /* ── Transfer Challenge ── */
@@ -5179,7 +5263,20 @@
         };
       });
     } else {
-      tcScenarios = base.transferChallenge.scenarios;
+      // Build neutral transfer scenario — do NOT use A1 Lost Property data
+      var _objBody = body.objective || (stub && stub.objective) || 'Use what you learned today.';
+      var _tgtLang = body.coreSentences ? body.coreSentences.slice(0, 2).map(function(s){ return s.sentence || s.model || s; }) : [];
+      tcScenarios = [{
+        id: 'sc1',
+        title: 'New Situation',
+        setting: 'A real-world context using today\'s language',
+        studentRole: 'Yourself',
+        partnerRole: 'Another person',
+        newGap: _objBody,
+        lostItems: [],
+        targetLanguage: _tgtLang,
+        successCriteria: [_objBody],
+      }];
     }
 
     /* ── Rubric ── */
@@ -5206,14 +5303,19 @@
         };
       });
     } else {
-      csSentences = base.coreSentences.sentences;
+      // Neutral fallback — do NOT use A1 Lost Property core sentences
+      csSentences = body.usefulPhrases && body.usefulPhrases.length
+        ? body.usefulPhrases.slice(0, 3).map(function(p, i) {
+            return { id: 'cs-' + i, model: p.phrase || p.p || p, coreSentenceNum: i + 1, breakdown: [], wordTable: [], tenseLink: null };
+          })
+        : [{ id: 'cs-0', model: body.objective || body.title || lessonId, coreSentenceNum: 1, breakdown: [], wordTable: [], tenseLink: null }];
     }
 
     /* ── Visual Time: synthesize from body.visual ── */
     var visual = body.visual || {};
     var vtVisuals = [];
     var vtMindMapItems = [];
-    var vtTagline = visual.caption || stub.objective || base.visualTime.tagline;
+    var vtTagline = visual.caption || stub.objective || body.objective || body.title || lessonId;
 
     if (body.vocabulary && body.vocabulary.length) {
       vtVisuals = body.vocabulary.slice(0, 4).map(function(v) {
@@ -5228,8 +5330,18 @@
         return { text: v.word, highlight: i < 2 };
       });
     } else {
-      vtVisuals = base.visualTime.visuals;
-      vtMindMapItems = base.visualTime.mindMapItems;
+      // Neutral fallback — build from useful phrases or core sentences — NOT A1 Lost Property
+      var _vtSource = body.usefulPhrases && body.usefulPhrases.length ? body.usefulPhrases.slice(0, 4) : [];
+      vtVisuals = _vtSource.length
+        ? _vtSource.map(function(p, i) {
+            var w = p.phrase || p.p || ('phrase ' + (i + 1));
+            return { emoji: ['💬','✅','📝','🎯'][i % 4], word: w, sentence: p.context || p.c || w, highlight: w };
+          })
+        : [{ emoji: '📚', word: body.title || lessonId, sentence: body.objective || body.title || lessonId, highlight: body.title || lessonId }];
+      vtMindMapItems = _vtSource.slice(0, 6).map(function(p, i) {
+        return { text: p.phrase || p.p || ('item ' + i), highlight: i < 2 };
+      });
+      if (!vtMindMapItems.length) vtMindMapItems = [{ text: body.title || lessonId, highlight: true }];
     }
 
     /* ── Grammar Focus: build from body.grammar ── */
@@ -5244,7 +5356,15 @@
         { type: 'errors', title: 'Common mistakes', content: null, errors: [] },
       ];
     } else {
-      gfSections = base.grammarFocus.sections;
+      // Neutral grammar fallback — build from grammarPointIds — NOT A1 Lost Property
+      var _gfIds = body.grammarPointIds || [];
+      gfSections = [
+        { type: 'what', title: 'What is it?', content: _gfIds.length ? 'Grammar focus: ' + _gfIds.join(', ') : 'Key language patterns for this lesson.' },
+        { type: 'how',  title: 'How does it work?', content: 'Study the examples in this lesson to see the pattern in use.' },
+        { type: 'when', title: 'When do I use it?', content: 'Use this language in the situations shown in this lesson.' },
+        { type: 'why',  title: 'Why is it important?', content: 'This language helps you communicate clearly in English.' },
+        { type: 'errors', title: 'Common mistakes', content: null, errors: [] },
+      ];
     }
 
     /* ── Assemble the normalized lesson object ── */
@@ -5252,13 +5372,26 @@
       id:                lessonId,
       version:           body.version || '1.0.0',
       contentType:       'CURATED_CORE',
-      cefrLevel:         body.cefrLevel || stub.cefrLevel || 'A1',
+      cefrLevel:         body.cefrLevel || stub.cefrLevel || (function(){ var m = lessonId && lessonId.match(/^([A-C][0-2])/); return m ? m[1] : 'A1'; })(),
       grammarPointIds:   body.grammarPointIds || stub.grammarFocus || [],
       title:             body.title || stub.title || lessonId,
       objective:         body.objective || stub.objective || '',
       estimatedMinutes:  stub.estimatedMinutes || 20,
       scenarioFamilyName: (LX.scenarioFamilies && LX.scenarioFamilies.find(function(f) { return f.id === (stub.scenarioFamily || 'personal_life'); }) || {}).name || 'English',
-      whatToRemember:    base.whatToRemember,
+      whatToRemember:    (function() {
+        // Build lesson-specific "what to remember" from vocabulary and grammar
+        if (body.vocabulary && body.vocabulary.length) {
+          return body.vocabulary.slice(0, 3).map(function(v) {
+            return { rule: '"' + v.word + '" — ' + v.definition, emoji: v.emoji || '📝' };
+          });
+        }
+        if (body.coreSentences && body.coreSentences.length) {
+          return body.coreSentences.slice(0, 3).map(function(s) {
+            return { rule: s.sentence || s.model || s, emoji: '✅' };
+          });
+        }
+        return [{ rule: 'Practise the key language from this lesson every day.', emoji: '🎯' }];
+      })(),
 
       visualTime: {
         stage:         'Stage 01',
@@ -5275,7 +5408,7 @@
         tagline:        'Understand the rule. See the pattern.',
         grammarName:    gfGrammar.title || ('Grammar: ' + (body.grammarPointIds || []).join(', ')),
         sections:       gfSections,
-        verbToBeTable:  base.grammarFocus.verbToBeTable,
+        verbToBeTable:  null,
       },
 
       coreSentences: {
@@ -5289,14 +5422,14 @@
         stage:   'Stage 04',
         label:   'Vocabulary',
         tagline: 'Learn the words. Build your toolkit.',
-        groups:  Object.keys(vocabGroups).length ? vocabGroups : base.vocabulary.groups,
+        groups:  Object.keys(vocabGroups).length ? vocabGroups : { words: { title: 'Key Words', emoji: '📖', items: [] } },
       },
 
       usefulSentences: {
         stage:   'Stage 04b',
         label:   'Useful Sentences',
         tagline: 'Real English for real situations.',
-        groups:  Object.keys(phraseGroups).length ? phraseGroups : base.usefulSentences.groups,
+        groups:  Object.keys(phraseGroups).length ? phraseGroups : { phrases: { title: 'Useful Phrases', colorClass: 'phrases-green', function: 'Key expressions for this lesson', items: [] } },
       },
 
       exercises: {
@@ -5315,8 +5448,8 @@
         partnerRole:     'Partner',
         goal:            stub.objective || 'Complete the conversation task',
         contentType:     'CURATED_CORE',
-        dialogue:        gd.turns && gd.turns.length ? gd.turns : base.guidedDialogue.dialogue,
-        partB:           gd.partB && gd.partB.length ? gd.partB : (base.guidedDialogue.partB || []),
+        dialogue:        gd.turns && gd.turns.length ? gd.turns : [],
+        partB:           gd.partB && gd.partB.length ? gd.partB : [],
         successChecklist: successChecklist,
       },
 
@@ -5345,7 +5478,24 @@
         scoreBands:  rubricBands,
       },
 
-      reviewPlan: base.reviewPlan,
+      reviewPlan: (function() {
+        // Build a lesson-specific review plan instead of copying A1 Lost Property
+        var lvl = body.cefrLevel || stub.cefrLevel || lessonId.match(/^([A-C][0-2])/)?.[1] || '';
+        var lsnTitle = body.title || stub.title || lessonId;
+        return {
+          stage: 'Stage 08',
+          label: 'Review Plan',
+          tagline: 'Keep it. Use it. Remember it.',
+          events: [
+            { timing: 'End of lesson', label: 'Oral recap', desc: 'Say aloud the key words and phrases from this lesson. Try without looking.', icon: '🎤', type: 'immediate' },
+            { timing: 'Same day', label: 'Quick review', desc: 'Write 3 sentences using vocabulary from "' + lsnTitle + '" before bed.', icon: '📝', type: 'sameday' },
+            { timing: 'Next lesson', label: 'New context', desc: 'Use the ' + (lvl || '') + ' language from this lesson in a short conversation with a partner.', icon: '🔄', type: 'nextlesson' },
+            { timing: '3 days', label: 'Short task', desc: 'Write or say 4 lines using the key phrases from this lesson in a new situation.', icon: '💬', type: 'threedays' },
+            { timing: '7 days', label: 'Independent use', desc: 'Use the language from this lesson independently — no notes.', icon: '🚀', type: 'sevendays' },
+            { timing: '2–4 weeks', label: 'Mixed review', desc: 'Combine this lesson\'s language with other ' + (lvl || '') + ' topics in a short task.', icon: '🔁', type: 'weeks' },
+          ],
+        };
+      })(),
     };
   }
 
